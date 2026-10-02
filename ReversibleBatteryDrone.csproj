@@ -63,8 +63,16 @@
       <HintPath>$(RepoManaged)\PhotonUnityNetworking.dll</HintPath>
       <Private>false</Private>
     </Reference>
+    <Reference Include="PhotonRealtime">
+      <HintPath>$(RepoManaged)\PhotonRealtime.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
     <Reference Include="UnityEngine">
       <HintPath>$(RepoManaged)\UnityEngine.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+    <Reference Include="UnityEngine.AudioModule">
+      <HintPath>$(RepoManaged)\UnityEngine.AudioModule.dll</HintPath>
       <Private>false</Private>
     </Reference>
     <Reference Include="UnityEngine.CoreModule">
