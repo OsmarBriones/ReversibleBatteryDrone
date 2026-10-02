@@ -73,8 +73,8 @@ internal class ReversibleDroneController : MonoBehaviour
 			{
 				itemDrone.targetValuables = true;
 				itemDrone.targetNonValuables = true;
-				itemDrone.targetEnemies = ConfigurationController.AllowMonsterDrain?.Value ?? true;
-				itemDrone.targetPlayers = ConfigurationController.AllowPlayerDrain?.Value ?? true;
+				itemDrone.targetEnemies = ConfigurationController.AllowTargetingMonsters?.Value ?? true;
+				itemDrone.targetPlayers = ConfigurationController.AllowTargetingPlayers?.Value ?? true;
 			}
 			else
 			{
@@ -199,7 +199,7 @@ internal class ReversibleDroneController : MonoBehaviour
 		}
 
 		// 2. Enemy
-		if (ConfigurationController.AllowMonsterDrain?.Value ?? true)
+		if (ConfigurationController.AllowTargetingMonsters?.Value ?? true)
 		{
 			EnemyParent enemyParent = target.GetComponentInParent<EnemyParent>() ?? target.GetComponent<EnemyParent>();
 			if (enemyParent != null && enemyParent.Enemy != null && enemyParent.Enemy.Health != null)
@@ -209,7 +209,7 @@ internal class ReversibleDroneController : MonoBehaviour
 		}
 
 		// 3. Player
-		if (ConfigurationController.AllowPlayerDrain?.Value ?? true)
+		if (ConfigurationController.AllowTargetingPlayers?.Value ?? true)
 		{
 			PlayerAvatar player = target.GetComponentInParent<PlayerAvatar>() ?? target.GetComponent<PlayerAvatar>();
 			if (player != null && !player.deadSet && player.playerHealth != null)
@@ -236,7 +236,7 @@ internal class ReversibleDroneController : MonoBehaviour
 			ItemBattery targetBattery = itemDrone.magnetTargetPhysGrabObject.GetComponent<ItemBattery>();
 			if ((bool)targetBattery && targetBattery != itemBattery)
 			{
-				float rate = ConfigurationController.DrainRateBattery?.Value ?? 5f;
+				float rate = ConfigurationController.TargetBatteryDrainPercentPerSecond?.Value ?? 5f;
 				targetBattery.Drain(rate);
 				itemBattery.ChargeBattery(gameObject, rate);
 
@@ -259,12 +259,12 @@ internal class ReversibleDroneController : MonoBehaviour
 				}
 
 				tickTimer += Time.deltaTime;
-				float tickRate = ConfigurationController.DrainTickRate?.Value ?? 0.5f;
+				float tickRate = ConfigurationController.LeechTickIntervalSeconds?.Value ?? 0.5f;
 				if (tickTimer >= tickRate)
 				{
 					tickTimer = 0f;
-					int dmg = ConfigurationController.DrainDamageMonsters?.Value ?? 2;
-					float gain = ConfigurationController.BatteryGainFromHealth?.Value ?? 3f;
+					int dmg = ConfigurationController.MonsterDamageFlatHpPerTick?.Value ?? 2;
+					float gain = ConfigurationController.DroneBatteryGainPercentPerTick?.Value ?? 3f;
 
 					enemyHealth.Hurt(dmg, Vector3.up * 0.1f);
 					itemBattery.ChargeBattery(gameObject, gain);
@@ -294,12 +294,12 @@ internal class ReversibleDroneController : MonoBehaviour
 			}
 
 			tickTimer += Time.deltaTime;
-			float tickRate = ConfigurationController.DrainTickRate?.Value ?? 0.5f;
+			float tickRate = ConfigurationController.LeechTickIntervalSeconds?.Value ?? 0.5f;
 			if (tickTimer >= tickRate)
 			{
 				tickTimer = 0f;
-				int dmg = ConfigurationController.DrainDamagePlayers?.Value ?? 1;
-				float gain = ConfigurationController.BatteryGainFromHealth?.Value ?? 3f;
+				int dmg = ConfigurationController.PlayerDamageFlatHpPerTick?.Value ?? 1;
+				float gain = ConfigurationController.DroneBatteryGainPercentPerTick?.Value ?? 3f;
 
 				player.playerHealth.HurtOther(dmg, player.transform.position, false);
 				itemBattery.ChargeBattery(gameObject, gain);

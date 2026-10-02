@@ -43,10 +43,10 @@ This document describes the runtime structure, data flow, and design decisions f
     - Checks `SemiFunc.IsMasterClientOrSingleplayer()`.
     - Applies `OverrideZeroGravity()`, `OverrideDrag(1f)`, `OverrideAngularDrag(10f)`.
     - When `itemDrone.magnetActive` is true, calls `controller.ExecuteDrain()`:
-      - If attached to item with battery: calls `targetBattery.Drain(rate)` and `droneBattery.ChargeBattery(rate)`.
-      - If attached to enemy: deals configurable damage (`DrainDamageMonsters`) and grants battery (`BatteryGainFromHealth`).
-      - If attached to player: deals configurable damage (`DrainDamagePlayers`) and grants battery (`BatteryGainFromHealth`).
-      - Detaches via `itemDrone.MagnetActiveToggle(false)` once drone reaches full battery or target has no health/battery left.
+      - If attached to item with battery: calls `targetBattery.Drain(rate)` and `droneBattery.ChargeBattery(rate)` (`TargetBatteryDrainPercentPerSecond`).
+      - If attached to enemy: deals configurable flat HP damage (`MonsterDamageFlatHpPerTick`) and grants battery percent (`DroneBatteryGainPercentPerTick`) every `LeechTickIntervalSeconds`.
+      - If attached to player: deals configurable flat HP damage (`PlayerDamageFlatHpPerTick`) and grants battery percent (`DroneBatteryGainPercentPerTick`) every `LeechTickIntervalSeconds`.
+      - Detaches via `itemDrone.MagnetActiveToggle(false)` once drone reaches full battery (`> 99%`) or target has no health/battery left.
 
 ---
 

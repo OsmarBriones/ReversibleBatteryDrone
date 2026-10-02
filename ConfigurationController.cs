@@ -7,33 +7,79 @@ internal static class ConfigurationController
 	private static ConfigFile? ConfigFile { get; set; }
 
 	internal static ConfigEntry<bool>? Enabled { get; private set; }
-	internal static ConfigEntry<float>? DrainRateBattery { get; private set; }
-	internal static ConfigEntry<int>? DrainDamageMonsters { get; private set; }
-	internal static ConfigEntry<int>? DrainDamagePlayers { get; private set; }
-	internal static ConfigEntry<float>? BatteryGainFromHealth { get; private set; }
-	internal static ConfigEntry<bool>? AllowMonsterDrain { get; private set; }
-	internal static ConfigEntry<bool>? AllowPlayerDrain { get; private set; }
-	internal static ConfigEntry<float>? DrainTickRate { get; private set; }
+
+	// Item Siphoning
+	internal static ConfigEntry<float>? TargetBatteryDrainPercentPerSecond { get; private set; }
+
+	// Life Leeching
+	internal static ConfigEntry<int>? MonsterDamageFlatHpPerTick { get; private set; }
+	internal static ConfigEntry<int>? PlayerDamageFlatHpPerTick { get; private set; }
+	internal static ConfigEntry<float>? DroneBatteryGainPercentPerTick { get; private set; }
+	internal static ConfigEntry<float>? LeechTickIntervalSeconds { get; private set; }
+	internal static ConfigEntry<bool>? AllowTargetingMonsters { get; private set; }
+	internal static ConfigEntry<bool>? AllowTargetingPlayers { get; private set; }
 
 	internal static void Initialize(ConfigFile config)
 	{
 		ConfigFile = config;
 
-		Enabled = ConfigFile.Bind("General", nameof(Enabled), true, "Enable or disable this mod.");
+		Enabled = ConfigFile.Bind(
+			"General",
+			nameof(Enabled),
+			true,
+			"Enable or disable the ReversibleBatteryDrone mod entirely."
+		);
 
-		DrainRateBattery = ConfigFile.Bind("Drain", nameof(DrainRateBattery), 5.0f, "Battery charge drained per second when siphoning items.");
+		// Item Siphoning
+		TargetBatteryDrainPercentPerSecond = ConfigFile.Bind(
+			"ItemSiphoning",
+			nameof(TargetBatteryDrainPercentPerSecond),
+			5.0f,
+			"Percentage of battery (0% to 100%) drained from the targeted item per second and transferred directly into the drone's battery."
+		);
 
-		DrainDamageMonsters = ConfigFile.Bind("Drain", nameof(DrainDamageMonsters), 2, "Damage per tick dealt to monsters when draining their life.");
+		// Life Leeching
+		MonsterDamageFlatHpPerTick = ConfigFile.Bind(
+			"LifeLeech",
+			nameof(MonsterDamageFlatHpPerTick),
+			2,
+			"Flat health points (HP) of damage dealt to the targeted monster on every tick."
+		);
 
-		DrainDamagePlayers = ConfigFile.Bind("Drain", nameof(DrainDamagePlayers), 1, "Damage per tick dealt to players when draining their life.");
+		PlayerDamageFlatHpPerTick = ConfigFile.Bind(
+			"LifeLeech",
+			nameof(PlayerDamageFlatHpPerTick),
+			1,
+			"Flat health points (HP) of damage dealt to the targeted player/teammate on every tick."
+		);
 
-		BatteryGainFromHealth = ConfigFile.Bind("Drain", nameof(BatteryGainFromHealth), 3.0f, "Battery gained by the drone per tick when siphoning health from monsters or players.");
+		DroneBatteryGainPercentPerTick = ConfigFile.Bind(
+			"LifeLeech",
+			nameof(DroneBatteryGainPercentPerTick),
+			3.0f,
+			"Percentage of battery charge (0% to 100%) added to the drone on every tick while leeching life from a monster or player."
+		);
 
-		AllowMonsterDrain = ConfigFile.Bind("Drain", nameof(AllowMonsterDrain), true, "Whether the drone can latch onto monsters in Drain mode.");
+		LeechTickIntervalSeconds = ConfigFile.Bind(
+			"LifeLeech",
+			nameof(LeechTickIntervalSeconds),
+			0.5f,
+			"Time in seconds between each damage and battery gain tick when leeching life from a living target."
+		);
 
-		AllowPlayerDrain = ConfigFile.Bind("Drain", nameof(AllowPlayerDrain), true, "Whether the drone can latch onto players in Drain mode.");
+		AllowTargetingMonsters = ConfigFile.Bind(
+			"LifeLeech",
+			nameof(AllowTargetingMonsters),
+			true,
+			"Whether the drone in Drain mode is allowed to latch onto monsters and leech their health."
+		);
 
-		DrainTickRate = ConfigFile.Bind("Drain", nameof(DrainTickRate), 0.5f, "Seconds between health drain damage ticks on living targets.");
+		AllowTargetingPlayers = ConfigFile.Bind(
+			"LifeLeech",
+			nameof(AllowTargetingPlayers),
+			true,
+			"Whether the drone in Drain mode is allowed to latch onto other players and leech their health (PvP friendly-fire toggle)."
+		);
 
 		ConfigFile.Save();
 	}

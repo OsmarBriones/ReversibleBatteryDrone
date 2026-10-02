@@ -24,13 +24,16 @@ Makes the charge drone reversible: 1st tap charges items, 2nd tap turns red to d
 ## Configuration
 All settings are controlled through `com.osmar.ReversibleBatteryDrone.cfg` located in `BepInEx/config`:
 
-- `DrainRateBattery` (default: `5.0`): Battery charge drained per second when siphoning items.
-- `DrainDamageMonsters` (default: `2`): Damage dealt per tick to monsters when leeching their life.
-- `DrainDamagePlayers` (default: `1`): Damage dealt per tick to players when leeching their life.
-- `BatteryGainFromHealth` (default: `3.0`): Battery percentage gained by the drone per tick when siphoning health.
-- `AllowMonsterDrain` (default: `true`): Whether the drone can latch onto monsters in Drain mode.
-- `AllowPlayerDrain` (default: `true`): Whether the drone can latch onto teammates/players in Drain mode.
-- `DrainTickRate` (default: `0.5`): Seconds between health drain damage ticks on living targets.
+### `[ItemSiphoning]`
+- `TargetBatteryDrainPercentPerSecond` (default: `5.0`): Percentage of battery (`0%` to `100%`) drained from the targeted item per second and transferred directly into the drone's battery.
+
+### `[LifeLeech]`
+- `MonsterDamageFlatHpPerTick` (default: `2`): Flat hit points (HP) of damage subtracted from the targeted monster on each tick.
+- `PlayerDamageFlatHpPerTick` (default: `1`): Flat hit points (HP) of damage subtracted from the targeted teammate/player on each tick.
+- `DroneBatteryGainPercentPerTick` (default: `3.0`): Percentage of battery charge (`0%` to `100%`) added to the drone on each tick while leeching life from a monster or player.
+- `LeechTickIntervalSeconds` (default: `0.5`): Time in seconds between each damage and battery gain tick when leeching life from a living target.
+- `AllowTargetingMonsters` (default: `true`): Whether the drone in Drain mode is allowed to latch onto monsters and leech their health.
+- `AllowTargetingPlayers` (default: `true`): Whether the drone in Drain mode is allowed to latch onto other players and leech their health (PvP friendly-fire toggle).
 
 ## Issues & Bug Reports
 The official way to report issues, suggest improvements, or submit feedback is by opening an issue on the official GitHub repository:
