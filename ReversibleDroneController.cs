@@ -21,6 +21,9 @@ internal class ReversibleDroneController : MonoBehaviour
 
 	private float tickTimer;
 	private EnemyParent? activeEnemyTarget;
+	private bool naturalFullChargeDetach;
+	private bool distanceBreakDetach;
+	private float lastPlayerInteractTime = -999f;
 
 	private void Awake()
 	{
@@ -108,7 +111,15 @@ internal class ReversibleDroneController : MonoBehaviour
 			{
 				EnemyParent detachedEnemy = activeEnemyTarget;
 				activeEnemyTarget = null;
-				NotifyEnemyOfPlayer(detachedEnemy, isAttach: false);
+
+				bool isNaturalOrDistance = naturalFullChargeDetach || distanceBreakDetach;
+				naturalFullChargeDetach = false;
+				distanceBreakDetach = false;
+
+				if (!isNaturalOrDistance)
+				{
+					NotifyEnemyOfPlayer(detachedEnemy, isAttach: false);
+				}
 			}
 		}
 	}
@@ -117,13 +128,22 @@ internal class ReversibleDroneController : MonoBehaviour
 	{
 		if (activeEnemyTarget != null)
 		{
-			NotifyEnemyOfPlayer(activeEnemyTarget, isAttach: false);
+			bool isNaturalOrDistance = naturalFullChargeDetach || distanceBreakDetach;
+			naturalFullChargeDetach = false;
+			distanceBreakDetach = false;
+
+			if (!isNaturalOrDistance)
+			{
+				NotifyEnemyOfPlayer(activeEnemyTarget, isAttach: false);
+			}
 			activeEnemyTarget = null;
 		}
 	}
 
 	public void HandleInteractPress()
 	{
+		lastPlayerInteractTime = Time.time;
+
 		// 3-state cycle:
 		// State 0 (Off) -> State 1 (Charge)
 		// State 1 (Charge) -> State 2 (Drain)
@@ -512,12 +532,14 @@ internal class ReversibleDroneController : MonoBehaviour
 		if (!SemiFunc.IsMasterClientOrSingleplayer()) return;
 		if (itemBattery == null || itemBattery.batteryLife >= 99.9f)
 		{
+			naturalFullChargeDetach = true;
 			itemDrone.MagnetActiveToggle(toggleBool: false);
 			return;
 		}
 
 		if (itemDrone.magnetTarget != null && Vector3.Distance(transform.position, itemDrone.magnetTarget.position) > 8f)
 		{
+			distanceBreakDetach = true;
 			itemDrone.MagnetActiveToggle(toggleBool: false);
 			return;
 		}
@@ -610,6 +632,10 @@ internal class ReversibleDroneController : MonoBehaviour
 
 				if (enemyHealth.dead || enemyHealth.healthCurrent <= 0 || itemBattery.batteryLife >= 99.5f)
 				{
+					if (itemBattery.batteryLife >= 99.5f)
+					{
+						naturalFullChargeDetach = true;
+					}
 					itemDrone.MagnetActiveToggle(toggleBool: false);
 				}
 			}
@@ -653,24 +679,33 @@ internal class ReversibleDroneController : MonoBehaviour
 		}
 	}
 
-	private PlayerAvatar? GetBestTargetPlayer()
+	private PlayerAvatar? GetResponsiblePlayerNearEnemy(Vector3 enemyPos, float maxDistance)
 	{
+		// 1. If currently held by a player within reasonable reach
 		if (physGrabObject != null && physGrabObject.playerGrabbing.Count > 0)
 		{
 			PlayerAvatar grabber = physGrabObject.playerGrabbing[0].playerAvatar;
 			if (grabber != null && !grabber.deadSet && !grabber.isDisabled)
 			{
-				return grabber;
+				if (Vector3.Distance(grabber.transform.position, enemyPos) <= maxDistance + 2.5f)
+				{
+					return grabber;
+				}
 			}
 		}
 
+		// 2. Drone owner if alive and within detection range
 		if (itemDrone != null && itemDrone.droneOwner != null && !itemDrone.droneOwner.deadSet && !itemDrone.droneOwner.isDisabled)
 		{
-			return itemDrone.droneOwner;
+			if (Vector3.Distance(itemDrone.droneOwner.transform.position, enemyPos) <= maxDistance)
+			{
+				return itemDrone.droneOwner;
+			}
 		}
 
+		// 3. Closest alive, non-disabled player within detection range
 		PlayerAvatar? nearest = null;
-		float minDist = float.MaxValue;
+		float minDist = maxDistance;
 		var players = SemiFunc.PlayerGetList();
 		if (players != null)
 		{
@@ -678,8 +713,8 @@ internal class ReversibleDroneController : MonoBehaviour
 			{
 				if (p != null && !p.deadSet && !p.isDisabled)
 				{
-					float d = Vector3.Distance(transform.position, p.transform.position);
-					if (d < minDist)
+					float d = Vector3.Distance(enemyPos, p.transform.position);
+					if (d <= minDist)
 					{
 						minDist = d;
 						nearest = p;
@@ -702,7 +737,21 @@ internal class ReversibleDroneController : MonoBehaviour
 
 		if (!shouldAlert) return;
 
-		PlayerAvatar? targetPlayer = GetBestTargetPlayer();
+		// For detach: only alert if there was an active player action (holding the drone or recently interacted with it near the enemy)
+		if (!isAttach)
+		{
+			bool isGrabbed = physGrabObject != null && physGrabObject.playerGrabbing.Count > 0;
+			bool recentInteract = (Time.time - lastPlayerInteractTime) < 1.0f;
+			if (!isGrabbed && !recentInteract)
+			{
+				return;
+			}
+		}
+
+		Vector3 enemyPos = ep.Enemy.CenterTransform != null ? ep.Enemy.CenterTransform.position : ep.transform.position;
+		float maxRange = ConfigurationController.AlertEnemyDetectionRange?.Value ?? 6.0f;
+
+		PlayerAvatar? targetPlayer = GetResponsiblePlayerNearEnemy(enemyPos, maxRange);
 		if (targetPlayer == null) return;
 
 		ep.Enemy.SetChaseTarget(targetPlayer);

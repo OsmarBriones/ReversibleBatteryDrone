@@ -61,10 +61,13 @@ This document describes the runtime structure, data flow, and design decisions f
       - Detaches via `itemDrone.MagnetActiveToggle(false)` once drone reaches full battery (`>= 99.5%`) or target has no health/battery left.
 
 ### 5. Monster Aggro & Chase Lifecycle
-- **Attach Aggro**: When `FindDrainTarget()` locks onto an enemy target (`targetType == 2`), `NotifyEnemyOfPlayer(ep, isAttach: true)` is triggered.
-- **Detach Aggro**: When an active enemy target detaches (via player turning off the drone, grabbing it away, switching mode, beam breaking due to distance, or drone reaching full charge), `ReversibleDroneController.Update()` detects the detachment and triggers `NotifyEnemyOfPlayer(ep, isAttach: false)`.
+- **Attach Aggro**: When `FindDrainTarget()` locks onto an enemy target (`targetType == 2`), `NotifyEnemyOfPlayer(ep, isAttach: true)` is triggered, but only if the player is holding the drone or within `AlertEnemyDetectionRange` (default 6m) of the monster.
+- **Detach Aggro**:
+  - **Natural Full Battery Detach**: If the drone reaches 100% (`>= 99.5%`) battery, it detaches automatically. The `naturalFullChargeDetach` flag suppresses the alert so the enemy is NOT provoked.
+  - **Distance Break Detach**: If the enemy moves away and breaks the tether (> 8m), `distanceBreakDetach` suppresses the alert.
+  - **Player-Action Detach**: If a player manually grabs/pulls the drone off the monster or interacts with it (toggles off / switches mode) while within `AlertEnemyDetectionRange`, the monster detects the player and initiates direct chase.
 - **Target Resolution**:
-  - The responsible player is resolved with priority: (1) player currently holding/grabbing the drone, (2) drone owner who activated it (`droneOwner`), (3) nearest active, living player.
+  - The responsible player is resolved with priority: (1) player currently holding/grabbing the drone, (2) drone owner who activated it (`droneOwner`) if within detection range, (3) nearest active, living player within detection range. If no player is within range, no alert is triggered.
 - **Chase Initiation**: Calls native host-authoritative `Enemy.SetChaseTarget(targetPlayer)` which triggers vision detection, camera impact effects/stingers, and enters `EnemyState.ChaseBegin` / `EnemyState.Chase`.
 - **Zero Impact on Vanilla Drones**: `ReversibleDroneController` and its hooks strictly operate on `ItemDroneBattery`. All other drones remain 100% vanilla.
 
