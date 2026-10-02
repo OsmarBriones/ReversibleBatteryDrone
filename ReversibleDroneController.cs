@@ -557,8 +557,8 @@ internal class ReversibleDroneController : MonoBehaviour
 			if (tickTimer >= tickRate)
 			{
 				tickTimer = 0f;
-				int dmg = ConfigurationController.MonsterDamageFlatHpPerTick?.Value ?? 2;
-				float gain = ConfigurationController.DroneBatteryGainPercentPerTick?.Value ?? 3f;
+				int dmg = ConfigurationController.MonsterDamageFlatHpPerTick?.Value ?? 1;
+				float gain = ConfigurationController.DroneBatteryGainPercentPerTick?.Value ?? 1f;
 
 				enemyHealth.Hurt(dmg, Vector3.up * 0.1f);
 				itemBattery.batteryLife = Mathf.Clamp(itemBattery.batteryLife + gain, 0f, 100f);
@@ -594,8 +594,8 @@ internal class ReversibleDroneController : MonoBehaviour
 			if (tickTimer >= tickRate)
 			{
 				tickTimer = 0f;
-				int dmg = ConfigurationController.PlayerDamageFlatHpPerTick?.Value ?? 1;
-				float gain = ConfigurationController.DroneBatteryGainPercentPerTick?.Value ?? 3f;
+				int dmg = ConfigurationController.PlayerDamageFlatHpPerTick?.Value ?? 10;
+				float gain = ConfigurationController.DroneBatteryGainPercentPerTick?.Value ?? 1f;
 
 				player.playerHealth.HurtOther(dmg, Vector3.zero, false);
 				itemBattery.batteryLife = Mathf.Clamp(itemBattery.batteryLife + gain, 0f, 100f);

@@ -37,9 +37,9 @@ All settings are controlled through `com.osmar.ReversibleBatteryDrone.cfg` locat
 - `TargetBatteryDrainPercentPerSecond` (default: `25`): Percentage of battery (`1%` to `100%`, integer) drained from the targeted item per second and transferred directly into the drone's battery. At 25%/s, an item with 100% battery drains in 4 seconds. Can be set up to 100% for instant drain.
 
 ### `[LifeLeech]`
-- `MonsterDamageFlatHpPerTick` (default: `2`): Flat hit points (HP) of damage (`1` to `100`) dealt to the targeted monster on each tick.
-- `PlayerDamageFlatHpPerTick` (default: `1`): Flat hit points (HP) of damage (`1` to `100`) dealt to the targeted teammate/player on each tick.
-- `DroneBatteryGainPercentPerTick` (default: `3`): Percentage of battery charge (`1%` to `100%`, integer) added to the drone on each tick while leeching life from a monster or player.
+- `MonsterDamageFlatHpPerTick` (default: `1`): Flat hit points (HP) of damage (`1` to `100`) dealt to the targeted monster on each tick.
+- `PlayerDamageFlatHpPerTick` (default: `10`): Flat hit points (HP) of damage (`1` to `100`) dealt to the targeted teammate/player on each tick.
+- `DroneBatteryGainPercentPerTick` (default: `1`): Percentage of battery charge (`1%` to `100%`, integer) added to the drone on each tick while leeching life from a monster or player.
 - `LeechTickIntervalSeconds` (default: `0.5`): Time in seconds between each damage and battery gain tick when leeching life from a living target (`0.1s` to `5.0s`).
 - `AllowTargetingMonsters` (default: `true`): Whether the drone in Drain mode is allowed to latch onto monsters and leech their health.
 - `AllowTargetingPlayers` (default: `true`): Whether the drone in Drain mode is allowed to latch onto other players and leech their health (PvP friendly-fire toggle).

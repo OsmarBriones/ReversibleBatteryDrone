@@ -45,7 +45,7 @@ internal static class ConfigurationController
 		MonsterDamageFlatHpPerTick = ConfigFile.Bind(
 			"LifeLeech",
 			nameof(MonsterDamageFlatHpPerTick),
-			2,
+			1,
 			new ConfigDescription(
 				"Flat health points (HP) of damage dealt to the targeted monster on every tick (1 to 100 HP).",
 				new AcceptableValueRange<int>(1, 100)
@@ -55,7 +55,7 @@ internal static class ConfigurationController
 		PlayerDamageFlatHpPerTick = ConfigFile.Bind(
 			"LifeLeech",
 			nameof(PlayerDamageFlatHpPerTick),
-			1,
+			10,
 			new ConfigDescription(
 				"Flat health points (HP) of damage dealt to the targeted player/teammate on every tick (1 to 100 HP).",
 				new AcceptableValueRange<int>(1, 100)
@@ -65,7 +65,7 @@ internal static class ConfigurationController
 		DroneBatteryGainPercentPerTick = ConfigFile.Bind(
 			"LifeLeech",
 			nameof(DroneBatteryGainPercentPerTick),
-			3,
+			1,
 			new ConfigDescription(
 				"Percentage of battery charge (1% to 100%) added to the drone on every tick while leeching life from a monster or player.",
 				new AcceptableValueRange<int>(1, 100)
