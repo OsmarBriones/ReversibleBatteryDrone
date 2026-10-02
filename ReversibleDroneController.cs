@@ -221,13 +221,9 @@ internal class ReversibleDroneController : MonoBehaviour
 		ItemBattery targetBattery = target.GetComponent<ItemBattery>();
 		if (targetBattery != null && targetBattery != itemBattery)
 		{
-			// Anti-exploit: do not allow draining items marked as unchargable
 			if (targetBattery.isUnchargable) return false;
-
-			// Anti-exploit: do not allow draining shop items (which have infinite battery in the shop)
 			ItemAttributes attr = target.GetComponent<ItemAttributes>() ?? target.GetComponentInParent<ItemAttributes>();
 			if (attr != null && attr.shopItem) return false;
-
 			return targetBattery.batteryLife > 0f;
 		}
 
@@ -254,6 +250,219 @@ internal class ReversibleDroneController : MonoBehaviour
 		return false;
 	}
 
+	public void CustomStateSearching()
+	{
+		if (itemDrone.stateStart)
+		{
+			itemDrone.stateTimerMax = 0.5f;
+			itemDrone.stateTimer = 0f;
+			itemDrone.BatteryToggle(activated: false);
+			itemDrone.lerpAnimationProgress = 0f;
+			itemDrone.itemActivated = true;
+			if (itemDrone.physGrabObject != null && itemDrone.physGrabObject.impactDetector != null)
+			{
+				itemDrone.physGrabObject.impactDetector.canHurtLogic = false;
+			}
+			if (itemDrone.onSwitchTransform != null)
+			{
+				Renderer r = itemDrone.onSwitchTransform.GetComponent<Renderer>();
+				if (r != null && r.material != null)
+				{
+					r.material.SetColor("_EmissionColor", itemDrone.droneColor);
+				}
+			}
+			if (itemDrone.itemDroneSounds != null && itemDrone.itemDroneSounds.DroneStart != null)
+			{
+				itemDrone.itemDroneSounds.DroneStart.Play(transform.position);
+			}
+			itemDrone.droneOwner = SemiFunc.PlayerAvatarGetFromPhotonID(itemToggle.playerTogglePhotonID);
+			itemDrone.stateStart = false;
+		}
+
+		itemDrone.soundDroneLoop.PlayLoop(playing: true, 2f, 2f);
+		itemDrone.AnimateDrone();
+
+		if (!SemiFunc.IsMasterClientOrSingleplayer())
+		{
+			return;
+		}
+
+		if (!itemToggle.toggleState)
+		{
+			itemDrone.StateSet(ItemDrone.State.Off);
+			return;
+		}
+
+		itemDrone.stateTimer += Time.deltaTime;
+		if (itemDrone.stateTimer < itemDrone.stateTimerMax)
+		{
+			return;
+		}
+
+		itemDrone.stateTimer = 0f;
+		itemDrone.playerTumbleTarget = null;
+		itemDrone.playerAvatarTarget = null;
+		itemDrone.targetIsPlayer = false;
+		itemDrone.targetIsEnemy = false;
+		itemDrone.targetIsLocalPlayer = false;
+
+		if (FindDrainTarget())
+		{
+			itemDrone.hadTarget = true;
+			itemDrone.ActivateMagnet();
+			itemDrone.StateSet(ItemDrone.State.BeamDeployed);
+		}
+	}
+
+	private bool FindDrainTarget()
+	{
+		if (itemBattery == null || itemBattery.batteryLife >= 99f) return false;
+
+		float searchRadius = 3.5f;
+		Collider[] colliders = Physics.OverlapSphere(transform.position, searchRadius);
+
+		float closestDistance = float.MaxValue;
+		GameObject? bestTarget = null;
+		int targetType = 0; // 1 = Battery Item, 2 = Enemy, 3 = Player
+
+		PlayerAvatar? holdingPlayer = null;
+		if (physGrabObject != null && physGrabObject.playerGrabbing.Count > 0)
+		{
+			holdingPlayer = physGrabObject.playerGrabbing[0].playerAvatar;
+		}
+
+		foreach (Collider col in colliders)
+		{
+			if (col == null || col.gameObject == gameObject) continue;
+
+			// 1. Check for ItemBattery
+			ItemBattery b = col.GetComponent<ItemBattery>() ?? col.GetComponentInParent<ItemBattery>();
+			if (b != null && b != itemBattery && b.batteryLife > 0.05f && !b.isUnchargable)
+			{
+				ItemAttributes attr = b.GetComponent<ItemAttributes>() ?? b.GetComponentInParent<ItemAttributes>();
+				if (attr == null || !attr.shopItem)
+				{
+					float dist = Vector3.Distance(transform.position, b.transform.position);
+					if (dist < closestDistance)
+					{
+						closestDistance = dist;
+						bestTarget = b.gameObject;
+						targetType = 1;
+					}
+				}
+			}
+
+			// 2. Check for Enemy
+			if (ConfigurationController.AllowTargetingMonsters?.Value ?? true)
+			{
+				EnemyParent ep = col.GetComponentInParent<EnemyParent>() ?? col.GetComponent<EnemyParent>();
+				if (ep != null && ep.Enemy != null && ep.Enemy.Health != null)
+				{
+					if (!ep.Enemy.Health.dead && ep.Enemy.Health.healthCurrent > 0)
+					{
+						Transform enemyCenter = ep.Enemy.CenterTransform != null ? ep.Enemy.CenterTransform : ep.transform;
+						float dist = Vector3.Distance(transform.position, enemyCenter.position);
+						if (dist < closestDistance)
+						{
+							closestDistance = dist;
+							bestTarget = ep.gameObject;
+							targetType = 2;
+						}
+					}
+				}
+			}
+
+			// 3. Check for Player
+			if (ConfigurationController.AllowTargetingPlayers?.Value ?? true)
+			{
+				PlayerAvatar pa = col.GetComponentInParent<PlayerAvatar>() ?? col.GetComponent<PlayerAvatar>();
+				if (pa != null && pa != holdingPlayer && !pa.deadSet && pa.playerHealth != null && pa.playerHealth.health > 0)
+				{
+					Transform vision = pa.PlayerVisionTarget != null && pa.PlayerVisionTarget.VisionTransform != null ? pa.PlayerVisionTarget.VisionTransform : pa.transform;
+					float dist = Vector3.Distance(transform.position, vision.position);
+					if (dist < closestDistance)
+					{
+						closestDistance = dist;
+						bestTarget = pa.gameObject;
+						targetType = 3;
+					}
+				}
+			}
+		}
+
+		if (bestTarget == null) return false;
+
+		// Attach to best target
+		if (targetType == 1)
+		{
+			ItemBattery targetBattery = bestTarget.GetComponent<ItemBattery>() ?? bestTarget.GetComponentInParent<ItemBattery>();
+			itemDrone.magnetTarget = targetBattery.transform;
+			itemDrone.magnetTargetPhysGrabObject = targetBattery.GetComponent<PhysGrabObject>();
+			itemDrone.magnetTargetRigidbody = targetBattery.GetComponent<Rigidbody>();
+			itemDrone.targetIsEnemy = false;
+			itemDrone.targetIsPlayer = false;
+			itemDrone.targetIsLocalPlayer = false;
+			itemDrone.enemyTarget = null;
+			itemDrone.playerAvatarTarget = null;
+			itemDrone.playerTumbleTarget = null;
+
+			Vector3 attachPos = targetBattery.transform.position;
+			PhotonView? pv = targetBattery.GetComponent<PhotonView>();
+			int viewId = pv != null ? pv.ViewID : 0;
+			itemDrone.NewRayHitPoint(attachPos, viewId, -1, targetBattery.transform);
+			if (itemDrone.rayHitPosition == Vector3.zero) itemDrone.rayHitPosition = new Vector3(0f, 0.05f, 0f);
+			itemDrone.attachPoint = itemDrone.rayHitPosition;
+			return true;
+		}
+
+		if (targetType == 2)
+		{
+			EnemyParent ep = bestTarget.GetComponentInParent<EnemyParent>() ?? bestTarget.GetComponent<EnemyParent>();
+			itemDrone.enemyTarget = ep;
+			itemDrone.targetIsEnemy = true;
+			itemDrone.targetIsPlayer = false;
+			itemDrone.targetIsLocalPlayer = false;
+			itemDrone.playerAvatarTarget = null;
+			itemDrone.playerTumbleTarget = null;
+
+			Transform enemyCenter = ep.Enemy.CenterTransform != null ? ep.Enemy.CenterTransform : ep.transform;
+			itemDrone.magnetTarget = enemyCenter;
+			itemDrone.magnetTargetPhysGrabObject = ep.Enemy.Rigidbody != null ? ep.Enemy.Rigidbody.physGrabObject : ep.GetComponent<PhysGrabObject>();
+			itemDrone.magnetTargetRigidbody = ep.Enemy.Rigidbody != null ? ep.Enemy.Rigidbody.rb : ep.GetComponent<Rigidbody>();
+
+			Vector3 attachPos = enemyCenter.position + Vector3.up * 0.1f;
+			int viewId = ep.Enemy.PhotonView != null ? ep.Enemy.PhotonView.ViewID : 0;
+			itemDrone.NewRayHitPoint(attachPos, viewId, -1, enemyCenter);
+			if (itemDrone.rayHitPosition == Vector3.zero) itemDrone.rayHitPosition = new Vector3(0f, 0.05f, 0f);
+			itemDrone.attachPoint = itemDrone.rayHitPosition;
+			return true;
+		}
+
+		if (targetType == 3)
+		{
+			PlayerAvatar pa = bestTarget.GetComponentInParent<PlayerAvatar>() ?? bestTarget.GetComponent<PlayerAvatar>();
+			itemDrone.playerAvatarTarget = pa;
+			itemDrone.targetIsPlayer = true;
+			itemDrone.targetIsEnemy = false;
+			itemDrone.targetIsLocalPlayer = pa.isLocal;
+			itemDrone.enemyTarget = null;
+			itemDrone.playerTumbleTarget = null;
+
+			Transform visionTransform = pa.PlayerVisionTarget != null && pa.PlayerVisionTarget.VisionTransform != null ? pa.PlayerVisionTarget.VisionTransform : pa.transform;
+			itemDrone.magnetTarget = visionTransform;
+			itemDrone.magnetTargetPhysGrabObject = null;
+			itemDrone.magnetTargetRigidbody = null;
+
+			Vector3 attachPos = visionTransform.position;
+			itemDrone.NewRayHitPoint(attachPos, pa.photonView.ViewID, -1, visionTransform);
+			if (itemDrone.rayHitPosition == Vector3.zero) itemDrone.rayHitPosition = new Vector3(0f, 0.05f, 0f);
+			itemDrone.attachPoint = itemDrone.rayHitPosition;
+			return true;
+		}
+
+		return false;
+	}
+
 	public void ExecuteDrain()
 	{
 		if (!SemiFunc.IsMasterClientOrSingleplayer()) return;
@@ -263,98 +472,114 @@ internal class ReversibleDroneController : MonoBehaviour
 			return;
 		}
 
-		// Siphoning from Item Battery
-		if ((bool)itemDrone.magnetTargetPhysGrabObject)
+		if (itemDrone.magnetTarget != null && Vector3.Distance(transform.position, itemDrone.magnetTarget.position) > 8f)
 		{
-			ItemBattery targetBattery = itemDrone.magnetTargetPhysGrabObject.GetComponent<ItemBattery>();
-			if ((bool)targetBattery && targetBattery != itemBattery)
-			{
-				// Problem 1 Fix: Always show the target's battery HUD with drain animation
-				targetBattery.OverrideBatteryShow(0.25f);
-				var visualLogic = targetBattery.GetComponentInChildren<BatteryVisualLogic>();
-				if (visualLogic != null)
-				{
-					visualLogic.OverrideBatteryDrain(0.25f);
-				}
-
-				// Also display the drone's battery HUD
-				itemBattery.OverrideBatteryShow(0.25f);
-
-				// Problem 2 Fix: Direct, conservative battery transfer
-				float rate = ConfigurationController.TargetBatteryDrainPercentPerSecond?.Value ?? 20f;
-				float transferAmount = rate * Time.deltaTime;
-
-				// Cannot drain more than the target has, nor charge more than what the drone needs
-				transferAmount = Mathf.Min(transferAmount, targetBattery.batteryLife);
-				float droneNeeded = Mathf.Max(0f, 100f - itemBattery.batteryLife);
-				transferAmount = Mathf.Min(transferAmount, droneNeeded);
-
-				if (transferAmount > 0f)
-				{
-					targetBattery.batteryLife = Mathf.Clamp(targetBattery.batteryLife - transferAmount, 0f, 100f);
-					itemBattery.batteryLife = Mathf.Clamp(itemBattery.batteryLife + transferAmount, 0f, 100f);
-
-					targetBattery.TryVisualUpdate();
-					itemBattery.TryVisualUpdate();
-				}
-
-				// Detach if target is completely drained or drone reached full capacity
-				if (targetBattery.batteryLife <= 0.05f)
-				{
-					targetBattery.batteryLife = 0f;
-					targetBattery.SetBatteryLife(0);
-					itemDrone.MagnetActiveToggle(toggleBool: false);
-				}
-				else if (itemBattery.batteryLife >= 99.5f)
-				{
-					itemBattery.batteryLife = 100f;
-					itemDrone.MagnetActiveToggle(toggleBool: false);
-				}
-				return;
-			}
-
-			// Leeching from Monster
-			EnemyParent enemyParent = itemDrone.magnetTargetPhysGrabObject.GetComponentInParent<EnemyParent>();
-			if ((bool)enemyParent && (bool)enemyParent.Enemy && (bool)enemyParent.Enemy.Health)
-			{
-				EnemyHealth enemyHealth = enemyParent.Enemy.Health;
-				if (enemyHealth.dead || enemyHealth.healthCurrent <= 0)
-				{
-					itemDrone.MagnetActiveToggle(toggleBool: false);
-					return;
-				}
-
-				itemBattery.OverrideBatteryShow(0.25f);
-
-				tickTimer += Time.deltaTime;
-				float tickRate = ConfigurationController.LeechTickIntervalSeconds?.Value ?? 0.5f;
-				if (tickTimer >= tickRate)
-				{
-					tickTimer = 0f;
-					int dmg = ConfigurationController.MonsterDamageFlatHpPerTick?.Value ?? 2;
-					float gain = ConfigurationController.DroneBatteryGainPercentPerTick?.Value ?? 3f;
-
-					enemyHealth.Hurt(dmg, Vector3.up * 0.1f);
-					itemBattery.batteryLife = Mathf.Clamp(itemBattery.batteryLife + gain, 0f, 100f);
-					itemBattery.TryVisualUpdate();
-
-					if (enemyHealth.dead || enemyHealth.healthCurrent <= 0 || itemBattery.batteryLife >= 99.5f)
-					{
-						itemDrone.MagnetActiveToggle(toggleBool: false);
-					}
-				}
-				return;
-			}
+			itemDrone.MagnetActiveToggle(toggleBool: false);
+			return;
 		}
 
-		// Leeching from Player
-		PlayerAvatar player = itemDrone.playerAvatarTarget;
-		if (!player && (bool)itemDrone.playerTumbleTarget)
+		// 1. Siphoning from Item Battery
+		ItemBattery? targetBattery = null;
+		if (itemDrone.magnetTargetPhysGrabObject != null)
+		{
+			targetBattery = itemDrone.magnetTargetPhysGrabObject.GetComponent<ItemBattery>();
+		}
+		if (targetBattery == null && itemDrone.magnetTarget != null)
+		{
+			targetBattery = itemDrone.magnetTarget.GetComponent<ItemBattery>() ?? itemDrone.magnetTarget.GetComponentInParent<ItemBattery>();
+		}
+
+		if (targetBattery != null && targetBattery != itemBattery)
+		{
+			targetBattery.OverrideBatteryShow(0.25f);
+			var visualLogic = targetBattery.GetComponentInChildren<BatteryVisualLogic>();
+			if (visualLogic != null)
+			{
+				visualLogic.OverrideBatteryDrain(0.25f);
+			}
+
+			itemBattery.OverrideBatteryShow(0.25f);
+
+			float rate = ConfigurationController.TargetBatteryDrainPercentPerSecond?.Value ?? 25f;
+			float transferAmount = rate * Time.deltaTime;
+
+			transferAmount = Mathf.Min(transferAmount, targetBattery.batteryLife);
+			float droneNeeded = Mathf.Max(0f, 100f - itemBattery.batteryLife);
+			transferAmount = Mathf.Min(transferAmount, droneNeeded);
+
+			if (transferAmount > 0f)
+			{
+				targetBattery.batteryLife = Mathf.Clamp(targetBattery.batteryLife - transferAmount, 0f, 100f);
+				itemBattery.batteryLife = Mathf.Clamp(itemBattery.batteryLife + transferAmount, 0f, 100f);
+
+				targetBattery.TryVisualUpdate();
+				itemBattery.TryVisualUpdate();
+			}
+
+			if (targetBattery.batteryLife <= 0.05f)
+			{
+				targetBattery.batteryLife = 0f;
+				targetBattery.SetBatteryLife(0);
+				itemDrone.MagnetActiveToggle(toggleBool: false);
+			}
+			else if (itemBattery.batteryLife >= 99.5f)
+			{
+				itemBattery.batteryLife = 100f;
+				itemDrone.MagnetActiveToggle(toggleBool: false);
+			}
+			return;
+		}
+
+		// 2. Leeching from Monster
+		EnemyParent? enemyParent = itemDrone.enemyTarget;
+		if (enemyParent == null && itemDrone.magnetTargetPhysGrabObject != null)
+		{
+			enemyParent = itemDrone.magnetTargetPhysGrabObject.GetComponentInParent<EnemyParent>();
+		}
+		if (enemyParent == null && itemDrone.magnetTarget != null)
+		{
+			enemyParent = itemDrone.magnetTarget.GetComponentInParent<EnemyParent>() ?? itemDrone.magnetTarget.GetComponent<EnemyParent>();
+		}
+
+		if (enemyParent != null && enemyParent.Enemy != null && enemyParent.Enemy.Health != null)
+		{
+			EnemyHealth enemyHealth = enemyParent.Enemy.Health;
+			if (enemyHealth.dead || enemyHealth.healthCurrent <= 0)
+			{
+				itemDrone.MagnetActiveToggle(toggleBool: false);
+				return;
+			}
+
+			itemBattery.OverrideBatteryShow(0.25f);
+
+			tickTimer += Time.deltaTime;
+			float tickRate = ConfigurationController.LeechTickIntervalSeconds?.Value ?? 0.5f;
+			if (tickTimer >= tickRate)
+			{
+				tickTimer = 0f;
+				int dmg = ConfigurationController.MonsterDamageFlatHpPerTick?.Value ?? 2;
+				float gain = ConfigurationController.DroneBatteryGainPercentPerTick?.Value ?? 3f;
+
+				enemyHealth.Hurt(dmg, Vector3.up * 0.1f);
+				itemBattery.batteryLife = Mathf.Clamp(itemBattery.batteryLife + gain, 0f, 100f);
+				itemBattery.TryVisualUpdate();
+
+				if (enemyHealth.dead || enemyHealth.healthCurrent <= 0 || itemBattery.batteryLife >= 99.5f)
+				{
+					itemDrone.MagnetActiveToggle(toggleBool: false);
+				}
+			}
+			return;
+		}
+
+		// 3. Leeching from Player
+		PlayerAvatar? player = itemDrone.playerAvatarTarget;
+		if (player == null && itemDrone.playerTumbleTarget != null)
 		{
 			player = itemDrone.playerTumbleTarget.playerAvatar;
 		}
 
-		if ((bool)player)
+		if (player != null)
 		{
 			if (player.deadSet || player.playerHealth == null || player.playerHealth.health <= 0)
 			{
@@ -372,7 +597,7 @@ internal class ReversibleDroneController : MonoBehaviour
 				int dmg = ConfigurationController.PlayerDamageFlatHpPerTick?.Value ?? 1;
 				float gain = ConfigurationController.DroneBatteryGainPercentPerTick?.Value ?? 3f;
 
-				player.playerHealth.HurtOther(dmg, player.transform.position, false);
+				player.playerHealth.HurtOther(dmg, Vector3.zero, false);
 				itemBattery.batteryLife = Mathf.Clamp(itemBattery.batteryLife + gain, 0f, 100f);
 				itemBattery.TryVisualUpdate();
 

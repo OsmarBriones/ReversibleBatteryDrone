@@ -37,16 +37,17 @@ This document describes the runtime structure, data flow, and design decisions f
   - **Virtual Floor (`0.001f`)**: While empty in Drain mode, a tiny floor (`0.001f`) is maintained in `ReversibleDroneController.Update()` so vanilla `SphereCheck()` and `TargetFindPlayer()` execute without early exit. Renders visually as 0 bars.
 
 ### 3. Targeting & Anti-Exploit
-- **`ItemDroneBattery_CustomTargetingCondition_Patch`** (Prefix on `ItemDroneBattery.CustomTargetingCondition`):
-  - When in `Drain` mode, replaces vanilla condition with `ReversibleDroneController.CustomTargetingCondition`:
-    - Objects with `ItemBattery`: valid if target battery `> 0%` and drone battery `< 99%`.
-    - Living Enemies: valid if `AllowTargetingMonsters` is true, enemy not dead, and drone battery `< 99%`.
-    - Living Players: valid if `AllowTargetingPlayers` is true, player not dead, and drone battery `< 99%`.
-    - **Anti-Exploits**:
-      - Items with `isUnchargable` cannot be drained.
-      - Unpurchased shop items (`shopItem`) cannot be drained.
-  - In `Charge` mode, falls through to vanilla `SemiFunc.BatteryChargeCondition`.
-- **Targeting Flags**: `ReversibleDroneController` dynamically sets `targetEnemies` and `targetPlayers` on `ItemDrone` during `Drain` mode, and clears them during `Charge` mode.
+- **`ItemDrone_StateSearching_Patch`** (Prefix on `ItemDrone.StateSearching`):
+  - In vanilla, `SphereCheck` requires `PhysGrabObjectCollider` on colliders, which enemies lack, making them impossible to detect.
+  - When in `Drain` mode, intercepts `StateSearching` and delegates to `ReversibleDroneController.CustomStateSearching()`:
+    - Scans a 3.5m radius for batteries, living monsters (`EnemyParent`), and living players (`PlayerAvatar`).
+    - Excludes the player currently holding the drone so it can be held and aimed.
+    - Connects to the closest valid target, establishing `magnetTarget` and a valid `rayHitPosition` (avoiding NRE in `DrawBeamLine`).
+- **`ItemDrone_CheckTargetDeath_Patch`** (Prefix on `ItemDrone.CheckTargetDeath`):
+  - Prevents vanilla `CheckTargetDeath` from prematurely turning off the drone if `enemyTarget.Spawned` is false in custom spawn setups.
+- **Anti-Exploits**:
+  - Items with `isUnchargable` cannot be drained.
+  - Unpurchased shop items (`shopItem`) cannot be drained.
 
 ### 4. Transfer Execution & Visual Feedback
 - **`ItemDroneBattery_Update_Patch`** (Prefix on `ItemDroneBattery.Update`):
