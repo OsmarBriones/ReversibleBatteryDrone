@@ -18,6 +18,8 @@ internal static class ConfigurationController
 	internal static ConfigEntry<float>? LeechTickIntervalSeconds { get; private set; }
 	internal static ConfigEntry<bool>? AllowTargetingMonsters { get; private set; }
 	internal static ConfigEntry<bool>? AllowTargetingPlayers { get; private set; }
+	internal static ConfigEntry<bool>? AlertEnemyOnAttach { get; private set; }
+	internal static ConfigEntry<bool>? AlertEnemyOnDetach { get; private set; }
 
 	internal static void Initialize(ConfigFile config)
 	{
@@ -94,6 +96,20 @@ internal static class ConfigurationController
 			nameof(AllowTargetingPlayers),
 			true,
 			"Whether the drone in Drain mode is allowed to latch onto other players and leech their health (PvP friendly-fire toggle)."
+		);
+
+		AlertEnemyOnAttach = ConfigFile.Bind(
+			"LifeLeech",
+			nameof(AlertEnemyOnAttach),
+			true,
+			"Whether attaching the drone in Drain mode to an enemy alerts them and initiates a direct chase toward the player."
+		);
+
+		AlertEnemyOnDetach = ConfigFile.Bind(
+			"LifeLeech",
+			nameof(AlertEnemyOnDetach),
+			true,
+			"Whether detaching the drone in Drain mode from an enemy alerts them and initiates a direct chase toward the player."
 		);
 
 		ConfigFile.Save();

@@ -20,6 +20,7 @@ internal class ReversibleDroneController : MonoBehaviour
 	private bool colorsCached;
 
 	private float tickTimer;
+	private EnemyParent? activeEnemyTarget;
 
 	private void Awake()
 	{
@@ -91,6 +92,33 @@ internal class ReversibleDroneController : MonoBehaviour
 				itemDrone.targetEnemies = false;
 				itemDrone.targetPlayers = false;
 			}
+		}
+
+		// Check if active enemy target detached
+		if (SemiFunc.IsMasterClientOrSingleplayer() && activeEnemyTarget != null)
+		{
+			bool stillAttached = itemDrone != null
+				&& itemDrone.currentState == ItemDrone.State.BeamDeployed
+				&& itemDrone.targetIsEnemy
+				&& itemDrone.enemyTarget == activeEnemyTarget
+				&& itemToggle != null && itemToggle.toggleState
+				&& CurrentMode == DroneMode.Drain;
+
+			if (!stillAttached)
+			{
+				EnemyParent detachedEnemy = activeEnemyTarget;
+				activeEnemyTarget = null;
+				NotifyEnemyOfPlayer(detachedEnemy, isAttach: false);
+			}
+		}
+	}
+
+	private void OnDestroy()
+	{
+		if (activeEnemyTarget != null)
+		{
+			NotifyEnemyOfPlayer(activeEnemyTarget, isAttach: false);
+			activeEnemyTarget = null;
 		}
 	}
 
@@ -392,6 +420,13 @@ internal class ReversibleDroneController : MonoBehaviour
 
 		if (bestTarget == null) return false;
 
+		if (targetType != 2 && activeEnemyTarget != null)
+		{
+			EnemyParent detachedEnemy = activeEnemyTarget;
+			activeEnemyTarget = null;
+			NotifyEnemyOfPlayer(detachedEnemy, isAttach: false);
+		}
+
 		// Attach to best target
 		if (targetType == 1)
 		{
@@ -435,6 +470,15 @@ internal class ReversibleDroneController : MonoBehaviour
 			itemDrone.NewRayHitPoint(attachPos, viewId, -1, enemyCenter);
 			if (itemDrone.rayHitPosition == Vector3.zero) itemDrone.rayHitPosition = new Vector3(0f, 0.05f, 0f);
 			itemDrone.attachPoint = itemDrone.rayHitPosition;
+
+			if (activeEnemyTarget != null && activeEnemyTarget != ep)
+			{
+				EnemyParent detachedEnemy = activeEnemyTarget;
+				activeEnemyTarget = null;
+				NotifyEnemyOfPlayer(detachedEnemy, isAttach: false);
+			}
+			activeEnemyTarget = ep;
+			NotifyEnemyOfPlayer(ep, isAttach: true);
 			return true;
 		}
 
@@ -606,6 +650,66 @@ internal class ReversibleDroneController : MonoBehaviour
 					itemDrone.MagnetActiveToggle(toggleBool: false);
 				}
 			}
+		}
+	}
+
+	private PlayerAvatar? GetBestTargetPlayer()
+	{
+		if (physGrabObject != null && physGrabObject.playerGrabbing.Count > 0)
+		{
+			PlayerAvatar grabber = physGrabObject.playerGrabbing[0].playerAvatar;
+			if (grabber != null && !grabber.deadSet && !grabber.isDisabled)
+			{
+				return grabber;
+			}
+		}
+
+		if (itemDrone != null && itemDrone.droneOwner != null && !itemDrone.droneOwner.deadSet && !itemDrone.droneOwner.isDisabled)
+		{
+			return itemDrone.droneOwner;
+		}
+
+		PlayerAvatar? nearest = null;
+		float minDist = float.MaxValue;
+		var players = SemiFunc.PlayerGetList();
+		if (players != null)
+		{
+			foreach (var p in players)
+			{
+				if (p != null && !p.deadSet && !p.isDisabled)
+				{
+					float d = Vector3.Distance(transform.position, p.transform.position);
+					if (d < minDist)
+					{
+						minDist = d;
+						nearest = p;
+					}
+				}
+			}
+		}
+		return nearest;
+	}
+
+	private void NotifyEnemyOfPlayer(EnemyParent? ep, bool isAttach)
+	{
+		if (!SemiFunc.IsMasterClientOrSingleplayer()) return;
+		if (ep == null || ep.Enemy == null) return;
+		if (ep.Enemy.Health != null && (ep.Enemy.Health.dead || ep.Enemy.Health.healthCurrent <= 0)) return;
+
+		bool shouldAlert = isAttach
+			? (ConfigurationController.AlertEnemyOnAttach?.Value ?? true)
+			: (ConfigurationController.AlertEnemyOnDetach?.Value ?? true);
+
+		if (!shouldAlert) return;
+
+		PlayerAvatar? targetPlayer = GetBestTargetPlayer();
+		if (targetPlayer == null) return;
+
+		ep.Enemy.SetChaseTarget(targetPlayer);
+		if (ep.Enemy.HasStateChase && (ep.Enemy.CurrentState == EnemyState.Chase || ep.Enemy.CurrentState == EnemyState.ChaseBegin))
+		{
+			ep.Enemy.TargetPlayerViewID = targetPlayer.photonView.ViewID;
+			ep.Enemy.TargetPlayerAvatar = targetPlayer;
 		}
 	}
 }

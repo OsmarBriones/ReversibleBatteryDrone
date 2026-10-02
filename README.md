@@ -14,6 +14,7 @@ Makes the charge drone reversible: 1st tap charges items, 2nd tap turns red to d
     - **2nd Tap**: Shuts the drone OFF.
 - **Battery Siphoning & HUD Feedback**: In Drain mode, the drone attaches to items with remaining energy and siphons their power directly into its own battery. The target's floating battery HUD is visible during draining with visual feedback.
 - **Life Leeching**: If deployed near monsters or other players in Drain mode, the drone latches onto them, leeching small amounts of health over time and converting it into battery charge.
+- **Monster Aggression & Chase Alerts**: Attaching the drone to an enemy or detaching/removing it from them alerts the monster and triggers a direct chase against the responsible player (enabled by default, customizable).
 - **Anti-Exploit & Energy Conservation**:
   - Direct 1:1 energy transfer prevents infinite battery loops.
   - Items in the shop (`shopItem`) cannot be siphoned.
@@ -43,6 +44,8 @@ All settings are controlled through `com.osmar.ReversibleBatteryDrone.cfg` locat
 - `LeechTickIntervalSeconds` (default: `0.5`): Time in seconds between each damage and battery gain tick when leeching life from a living target (`0.1s` to `5.0s`).
 - `AllowTargetingMonsters` (default: `true`): Whether the drone in Drain mode is allowed to latch onto monsters and leech their health.
 - `AllowTargetingPlayers` (default: `true`): Whether the drone in Drain mode is allowed to latch onto other players and leech their health (PvP friendly-fire toggle).
+- `AlertEnemyOnAttach` (default: `true`): Whether attaching the drone in Drain mode to an enemy alerts them and initiates a direct chase toward the player.
+- `AlertEnemyOnDetach` (default: `true`): Whether detaching the drone in Drain mode from an enemy alerts them and initiates a direct chase toward the player.
 
 ## Issues & Bug Reports
 The official way to report issues, suggest improvements, or submit feedback is by opening an issue on the official GitHub repository:

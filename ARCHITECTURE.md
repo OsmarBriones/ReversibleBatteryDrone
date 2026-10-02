@@ -60,6 +60,14 @@ This document describes the runtime structure, data flow, and design decisions f
       - **Life Leeching**: Deals flat HP damage (`MonsterDamageFlatHpPerTick` / `PlayerDamageFlatHpPerTick`) and increments drone battery (`DroneBatteryGainPercentPerTick`) on interval ticks.
       - Detaches via `itemDrone.MagnetActiveToggle(false)` once drone reaches full battery (`>= 99.5%`) or target has no health/battery left.
 
+### 5. Monster Aggro & Chase Lifecycle
+- **Attach Aggro**: When `FindDrainTarget()` locks onto an enemy target (`targetType == 2`), `NotifyEnemyOfPlayer(ep, isAttach: true)` is triggered.
+- **Detach Aggro**: When an active enemy target detaches (via player turning off the drone, grabbing it away, switching mode, beam breaking due to distance, or drone reaching full charge), `ReversibleDroneController.Update()` detects the detachment and triggers `NotifyEnemyOfPlayer(ep, isAttach: false)`.
+- **Target Resolution**:
+  - The responsible player is resolved with priority: (1) player currently holding/grabbing the drone, (2) drone owner who activated it (`droneOwner`), (3) nearest active, living player.
+- **Chase Initiation**: Calls native host-authoritative `Enemy.SetChaseTarget(targetPlayer)` which triggers vision detection, camera impact effects/stingers, and enters `EnemyState.ChaseBegin` / `EnemyState.Chase`.
+- **Zero Impact on Vanilla Drones**: `ReversibleDroneController` and its hooks strictly operate on `ItemDroneBattery`. All other drones remain 100% vanilla.
+
 ---
 
 ## Key Design Decisions & Invariants
