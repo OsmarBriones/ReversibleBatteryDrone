@@ -195,6 +195,13 @@ internal class ReversibleDroneController : MonoBehaviour
 		ItemBattery targetBattery = target.GetComponent<ItemBattery>();
 		if (targetBattery != null && targetBattery != itemBattery)
 		{
+			// Anti-exploit: do not allow draining items marked as unchargable
+			if (targetBattery.isUnchargable) return false;
+
+			// Anti-exploit: do not allow draining shop items (which have infinite battery in the shop)
+			ItemAttributes attr = target.GetComponent<ItemAttributes>() ?? target.GetComponentInParent<ItemAttributes>();
+			if (attr != null && attr.shopItem) return false;
+
 			return targetBattery.batteryLife > 0f;
 		}
 
