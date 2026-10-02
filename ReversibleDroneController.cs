@@ -63,7 +63,17 @@ internal class ReversibleDroneController : MonoBehaviour
 		{
 			DroneCycleState = 0;
 			CurrentMode = DroneMode.Charge;
+			if (itemBattery != null && itemBattery.batteryLife <= 0.05f)
+			{
+				itemBattery.batteryLife = 0f;
+			}
 			UpdateVisuals();
+		}
+
+		// Keep tiny positive charge floor while in Drain mode so vanilla searching and sphere checks never abort
+		if (CurrentMode == DroneMode.Drain && itemBattery != null && itemBattery.batteryLife <= 0.05f)
+		{
+			itemBattery.batteryLife = 0.001f;
 		}
 
 		// Ensure targeting flags match current mode during search
@@ -91,13 +101,25 @@ internal class ReversibleDroneController : MonoBehaviour
 		// State 1 (Charge) -> State 2 (Drain)
 		// State 2 (Drain) -> State 0 (Off)
 		int player = SemiFunc.PhotonViewIDPlayerAvatarLocal();
+		bool hasCharge = itemBattery != null && itemBattery.batteryLife > 0.05f;
 
 		if (DroneCycleState == 0)
 		{
-			// 1st tap: Turn ON in Charge mode (Yellow)
-			DroneCycleState = 1;
-			SetMode(DroneMode.Charge);
-			itemToggle.ToggleItem(true, player);
+			if (hasCharge)
+			{
+				// 1st tap with charge: Turn ON in Charge mode (Yellow)
+				DroneCycleState = 1;
+				SetMode(DroneMode.Charge);
+				itemToggle.ToggleItem(true, player);
+			}
+			else
+			{
+				// 1st tap when empty (0% battery): Skip unusable charge mode and go directly to Drain mode (Red)!
+				DroneCycleState = 2;
+				SetMode(DroneMode.Drain);
+				itemToggle.ToggleItem(true, player);
+				PlayModeSwitchSound();
+			}
 		}
 		else if (DroneCycleState == 1)
 		{
@@ -108,7 +130,7 @@ internal class ReversibleDroneController : MonoBehaviour
 		}
 		else
 		{
-			// 3rd tap: Turn OFF
+			// 3rd tap (or 2nd tap when empty): Turn OFF
 			DroneCycleState = 0;
 			SetMode(DroneMode.Charge); // reset for next activation
 			itemToggle.ToggleItem(false, player);
@@ -134,6 +156,10 @@ internal class ReversibleDroneController : MonoBehaviour
 		if (CurrentMode == DroneMode.Drain)
 		{
 			DroneCycleState = 2;
+			if (itemBattery != null && itemBattery.batteryLife <= 0.05f)
+			{
+				itemBattery.batteryLife = 0.001f;
+			}
 		}
 		else if (itemToggle != null && itemToggle.toggleState)
 		{

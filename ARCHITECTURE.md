@@ -19,40 +19,52 @@ This document describes the runtime structure, data flow, and design decisions f
   - Automatically attaches the `ReversibleDroneController` MonoBehaviour component to the drone GameObject.
   - Caches original colors (yellow beam, yellow emission, light).
 
-### 2. 3-State Sequential Interaction
+### 2. 3-State Sequential Interaction & Empty Battery Handling
 - **`ItemToggle_Update_Patch`** (Prefix on `ItemToggle.Update`):
   - Checks if `physGrabObject.heldByLocalPlayer` and `SemiFunc.InputDown(InputKey.Interact)` (`E`).
   - Calls `ReversibleDroneController.HandleInteractPress()`:
-    - **From Off (0) -> Charge (1)**: Calls `itemToggle.ToggleItem(true)`, sets mode to `Charge`, beam & LED yellow.
-    - **From Charge (1) -> Drain (2)**: Keeps drone active, switches mode to `Drain`, beam & LED red.
-    - **From Drain (2) -> Off (0)**: Calls `itemToggle.ToggleItem(false)`, resets mode to `Charge`.
+    - **When Drone Has Charge**:
+      - **From Off (0) -> Charge (1)**: Calls `itemToggle.ToggleItem(true)`, sets mode to `Charge`, beam & LED yellow.
+      - **From Charge (1) -> Drain (2)**: Keeps drone active, switches mode to `Drain`, beam & LED red.
+      - **From Drain (2) -> Off (0)**: Calls `itemToggle.ToggleItem(false)`, resets mode to `Charge`.
+    - **When Drone Is Empty (0% Battery)**:
+      - **From Off (0) -> Drain (2)**: Immediately skips unusable Charge mode and turns ON in `Drain` mode (Red), allowing direct recharging.
+      - **From Drain (2) -> Off (0)**: Shuts drone OFF.
   - Returns `false` to skip vanilla toggle logic.
+- **Empty Battery Lifecyle & Patches**:
+  - **`ItemDrone_StateOff_Patch`**: When toggled ON in Drain mode while empty, transitions `ItemDrone` from `State.Off` to `State.Searching`.
+  - **`ItemDrone_StateSet_Patch`**: Intercepts `ItemDrone.StateSet` and suppresses transitions to `State.NoBattery` when `CurrentMode == DroneMode.Drain`.
+  - **Virtual Floor (`0.001f`)**: While empty in Drain mode, a tiny floor (`0.001f`) is maintained in `ReversibleDroneController.Update()` so vanilla `SphereCheck()` and `TargetFindPlayer()` execute without early exit. Renders visually as 0 bars.
 
-### 3. Targeting
+### 3. Targeting & Anti-Exploit
 - **`ItemDroneBattery_CustomTargetingCondition_Patch`** (Prefix on `ItemDroneBattery.CustomTargetingCondition`):
   - When in `Drain` mode, replaces vanilla condition with `ReversibleDroneController.CustomTargetingCondition`:
     - Objects with `ItemBattery`: valid if target battery `> 0%` and drone battery `< 99%`.
-    - Living Enemies: valid if `AllowMonsterDrain` is true, enemy not dead, and drone battery `< 99%`.
-    - Living Players: valid if `AllowPlayerDrain` is true, player not dead, and drone battery `< 99%`.
+    - Living Enemies: valid if `AllowTargetingMonsters` is true, enemy not dead, and drone battery `< 99%`.
+    - Living Players: valid if `AllowTargetingPlayers` is true, player not dead, and drone battery `< 99%`.
+    - **Anti-Exploits**:
+      - Items with `isUnchargable` cannot be drained.
+      - Unpurchased shop items (`shopItem`) cannot be drained.
   - In `Charge` mode, falls through to vanilla `SemiFunc.BatteryChargeCondition`.
 - **Targeting Flags**: `ReversibleDroneController` dynamically sets `targetEnemies` and `targetPlayers` on `ItemDrone` during `Drain` mode, and clears them during `Charge` mode.
 
-### 4. Transfer Execution
+### 4. Transfer Execution & Visual Feedback
 - **`ItemDroneBattery_Update_Patch`** (Prefix on `ItemDroneBattery.Update`):
   - When in `Drain` mode:
     - Checks `SemiFunc.IsMasterClientOrSingleplayer()`.
     - Applies `OverrideZeroGravity()`, `OverrideDrag(1f)`, `OverrideAngularDrag(10f)`.
     - When `itemDrone.magnetActive` is true, calls `controller.ExecuteDrain()`:
-      - If attached to item with battery: calls `targetBattery.Drain(rate)` and `droneBattery.ChargeBattery(rate)` (`TargetBatteryDrainPercentPerSecond`).
-      - If attached to enemy: deals configurable flat HP damage (`MonsterDamageFlatHpPerTick`) and grants battery percent (`DroneBatteryGainPercentPerTick`) every `LeechTickIntervalSeconds`.
-      - If attached to player: deals configurable flat HP damage (`PlayerDamageFlatHpPerTick`) and grants battery percent (`DroneBatteryGainPercentPerTick`) every `LeechTickIntervalSeconds`.
-      - Detaches via `itemDrone.MagnetActiveToggle(false)` once drone reaches full battery (`> 99%`) or target has no health/battery left.
+      - **Item Siphoning**: Direct conservative 1:1 transfer. Clamps transfer to target's available battery and drone's missing battery.
+      - **Target HUD Feedback**: Calls `targetBattery.OverrideBatteryShow(0.25f)` and `visualLogic.OverrideBatteryDrain(0.25f)` every frame so the item's floating HUD and drain animation are prominently displayed.
+      - **Life Leeching**: Deals flat HP damage (`MonsterDamageFlatHpPerTick` / `PlayerDamageFlatHpPerTick`) and increments drone battery (`DroneBatteryGainPercentPerTick`) on interval ticks.
+      - Detaches via `itemDrone.MagnetActiveToggle(false)` once drone reaches full battery (`>= 99.5%`) or target has no health/battery left.
 
 ---
 
 ## Key Design Decisions & Invariants
 
-- **Zero Keybind Conflicts**: Operates entirely through the existing `InputKey.Interact` (`E`), preserving mod compatibility and player Muscle memory.
-- **Visual Clarity**: Instant visual feedback via red emission map (`_EmissionColor`), red point light (`ItemLight`), and red laser beam (`LineBetweenTwoPoints`).
-- **Graceful Detachment**: The drone releases its target as soon as it is fully charged (`> 99f`) or the target is drained, preventing wasted energy or endless latching.
+- **Zero Keybind Conflicts**: Operates entirely through the existing `InputKey.Interact` (`E`), preserving mod compatibility and player muscle memory.
+- **Strict Energy Conservation**: No infinite battery loops, 1:1 battery transfer, shop items protected, and player stamina unaffected.
+- **Visual Clarity**: Instant visual feedback via red emission map (`_EmissionColor`), red point light (`ItemLight`), and red laser beam (`LineBetweenTwoPoints`). Target items display floating battery HUD with drain animation.
+- **Graceful Detachment**: The drone releases its target as soon as it is fully charged or the target is drained.
 - **Standalone Build**: Compiles into a single self-contained DLL (`ReversibleBatteryDrone.dll`) deployed to both Steam and r2modman debug plugins.
