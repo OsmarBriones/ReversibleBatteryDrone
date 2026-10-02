@@ -25,7 +25,7 @@ Makes the charge drone reversible: 1st tap charges items, 2nd tap turns red to d
 All settings are controlled through `com.osmar.ReversibleBatteryDrone.cfg` located in `BepInEx/config`:
 
 ### `[ItemSiphoning]`
-- `TargetBatteryDrainPercentPerSecond` (default: `5.0`): Percentage of battery (`0%` to `100%`) drained from the targeted item per second and transferred directly into the drone's battery.
+- `TargetBatteryDrainPercentPerSecond` (default: `20.0`): Percentage of battery (`0%` to `100%`) drained from the targeted item per second and transferred directly into the drone's battery. At 20%/s, an item with 100% battery drains completely in 5 seconds.
 
 ### `[LifeLeech]`
 - `MonsterDamageFlatHpPerTick` (default: `2`): Flat hit points (HP) of damage subtracted from the targeted monster on each tick.

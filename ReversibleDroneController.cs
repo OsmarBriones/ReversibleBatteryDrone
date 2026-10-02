@@ -224,7 +224,7 @@ internal class ReversibleDroneController : MonoBehaviour
 	public void ExecuteDrain()
 	{
 		if (!SemiFunc.IsMasterClientOrSingleplayer()) return;
-		if (itemBattery == null || itemBattery.batteryLife >= 100f)
+		if (itemBattery == null || itemBattery.batteryLife >= 99.9f)
 		{
 			itemDrone.MagnetActiveToggle(toggleBool: false);
 			return;
@@ -236,12 +236,45 @@ internal class ReversibleDroneController : MonoBehaviour
 			ItemBattery targetBattery = itemDrone.magnetTargetPhysGrabObject.GetComponent<ItemBattery>();
 			if ((bool)targetBattery && targetBattery != itemBattery)
 			{
-				float rate = ConfigurationController.TargetBatteryDrainPercentPerSecond?.Value ?? 5f;
-				targetBattery.Drain(rate);
-				itemBattery.ChargeBattery(gameObject, rate);
-
-				if (targetBattery.batteryLife <= 0f || itemBattery.batteryLife > 99f)
+				// Problem 1 Fix: Always show the target's battery HUD with drain animation
+				targetBattery.OverrideBatteryShow(0.25f);
+				var visualLogic = targetBattery.GetComponentInChildren<BatteryVisualLogic>();
+				if (visualLogic != null)
 				{
+					visualLogic.OverrideBatteryDrain(0.25f);
+				}
+
+				// Also display the drone's battery HUD
+				itemBattery.OverrideBatteryShow(0.25f);
+
+				// Problem 2 Fix: Direct, conservative battery transfer
+				float rate = ConfigurationController.TargetBatteryDrainPercentPerSecond?.Value ?? 20f;
+				float transferAmount = rate * Time.deltaTime;
+
+				// Cannot drain more than the target has, nor charge more than what the drone needs
+				transferAmount = Mathf.Min(transferAmount, targetBattery.batteryLife);
+				float droneNeeded = Mathf.Max(0f, 100f - itemBattery.batteryLife);
+				transferAmount = Mathf.Min(transferAmount, droneNeeded);
+
+				if (transferAmount > 0f)
+				{
+					targetBattery.batteryLife = Mathf.Clamp(targetBattery.batteryLife - transferAmount, 0f, 100f);
+					itemBattery.batteryLife = Mathf.Clamp(itemBattery.batteryLife + transferAmount, 0f, 100f);
+
+					targetBattery.TryVisualUpdate();
+					itemBattery.TryVisualUpdate();
+				}
+
+				// Detach if target is completely drained or drone reached full capacity
+				if (targetBattery.batteryLife <= 0.05f)
+				{
+					targetBattery.batteryLife = 0f;
+					targetBattery.SetBatteryLife(0);
+					itemDrone.MagnetActiveToggle(toggleBool: false);
+				}
+				else if (itemBattery.batteryLife >= 99.5f)
+				{
+					itemBattery.batteryLife = 100f;
 					itemDrone.MagnetActiveToggle(toggleBool: false);
 				}
 				return;
@@ -258,6 +291,8 @@ internal class ReversibleDroneController : MonoBehaviour
 					return;
 				}
 
+				itemBattery.OverrideBatteryShow(0.25f);
+
 				tickTimer += Time.deltaTime;
 				float tickRate = ConfigurationController.LeechTickIntervalSeconds?.Value ?? 0.5f;
 				if (tickTimer >= tickRate)
@@ -267,9 +302,10 @@ internal class ReversibleDroneController : MonoBehaviour
 					float gain = ConfigurationController.DroneBatteryGainPercentPerTick?.Value ?? 3f;
 
 					enemyHealth.Hurt(dmg, Vector3.up * 0.1f);
-					itemBattery.ChargeBattery(gameObject, gain);
+					itemBattery.batteryLife = Mathf.Clamp(itemBattery.batteryLife + gain, 0f, 100f);
+					itemBattery.TryVisualUpdate();
 
-					if (enemyHealth.dead || enemyHealth.healthCurrent <= 0 || itemBattery.batteryLife > 99f)
+					if (enemyHealth.dead || enemyHealth.healthCurrent <= 0 || itemBattery.batteryLife >= 99.5f)
 					{
 						itemDrone.MagnetActiveToggle(toggleBool: false);
 					}
@@ -293,6 +329,8 @@ internal class ReversibleDroneController : MonoBehaviour
 				return;
 			}
 
+			itemBattery.OverrideBatteryShow(0.25f);
+
 			tickTimer += Time.deltaTime;
 			float tickRate = ConfigurationController.LeechTickIntervalSeconds?.Value ?? 0.5f;
 			if (tickTimer >= tickRate)
@@ -302,9 +340,10 @@ internal class ReversibleDroneController : MonoBehaviour
 				float gain = ConfigurationController.DroneBatteryGainPercentPerTick?.Value ?? 3f;
 
 				player.playerHealth.HurtOther(dmg, player.transform.position, false);
-				itemBattery.ChargeBattery(gameObject, gain);
+				itemBattery.batteryLife = Mathf.Clamp(itemBattery.batteryLife + gain, 0f, 100f);
+				itemBattery.TryVisualUpdate();
 
-				if (player.deadSet || player.playerHealth.health <= 0 || itemBattery.batteryLife > 99f)
+				if (player.deadSet || player.playerHealth.health <= 0 || itemBattery.batteryLife >= 99.5f)
 				{
 					itemDrone.MagnetActiveToggle(toggleBool: false);
 				}

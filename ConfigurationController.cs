@@ -34,8 +34,8 @@ internal static class ConfigurationController
 		TargetBatteryDrainPercentPerSecond = ConfigFile.Bind(
 			"ItemSiphoning",
 			nameof(TargetBatteryDrainPercentPerSecond),
-			5.0f,
-			"Percentage of battery (0% to 100%) drained from the targeted item per second and transferred directly into the drone's battery."
+			20.0f,
+			"Percentage of battery (0% to 100%) drained from the targeted item per second and transferred directly into the drone's battery. At 20%, an item with 100% battery drains completely in 5 seconds."
 		);
 
 		// Life Leeching
