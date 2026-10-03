@@ -118,8 +118,8 @@ internal static class ConfigurationController
 			nameof(AlertEnemyDetectionRange),
 			6,
 			new ConfigDescription(
-				"Maximum distance in meters (2 to 20 meters, integer) between the player and the enemy for the enemy to detect and chase the player on attach/detach. If no player is within this range, or if the drone detaches naturally on full battery, the enemy is not alerted.",
-				new AcceptableValueRange<int>(2, 20)
+				"Maximum distance in meters (1 to 20 meters, integer) between the player and the enemy for the enemy to detect and chase the player on attach/detach. If no player is within this range, or if the drone detaches naturally on full battery, the enemy is not alerted.",
+				new AcceptableValueRange<int>(1, 20)
 			)
 		);
 
