@@ -46,7 +46,7 @@ All settings are controlled through `com.osmar.ReversibleBatteryDrone.cfg` locat
 - `AllowTargetingPlayers` (default: `true`): Whether the drone in Drain mode is allowed to latch onto other players and leech their health (PvP friendly-fire toggle).
 - `AlertEnemyOnAttach` (default: `true`): Whether attaching the drone in Drain mode to an enemy alerts them and initiates a direct chase toward the player.
 - `AlertEnemyOnDetach` (default: `true`): Whether detaching the drone in Drain mode from an enemy alerts them and initiates a direct chase toward the player (only applies if a player actively grabbed/interacted with it near the monster).
-- `AlertEnemyDetectionRange` (default: `6.0`): Maximum distance in meters (`2.0m` to `20.0m`) between the player and the enemy for the enemy to detect and chase the player on attach/detach. If the player is outside this range, or if the drone naturally detaches on full charge or distance break, the enemy will not be alerted.
+- `AlertEnemyDetectionRange` (default: `6`): Maximum distance in meters (`2m` to `20m`, integer) between the player and the enemy for the enemy to detect and chase the player on attach/detach. If the player is outside this range, or if the drone naturally detaches on full charge or distance break, the enemy will not be alerted.
 
 ## Issues & Bug Reports
 The official way to report issues, suggest improvements, or submit feedback is by opening an issue on the official GitHub repository:

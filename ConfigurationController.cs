@@ -20,7 +20,7 @@ internal static class ConfigurationController
 	internal static ConfigEntry<bool>? AllowTargetingPlayers { get; private set; }
 	internal static ConfigEntry<bool>? AlertEnemyOnAttach { get; private set; }
 	internal static ConfigEntry<bool>? AlertEnemyOnDetach { get; private set; }
-	internal static ConfigEntry<float>? AlertEnemyDetectionRange { get; private set; }
+	internal static ConfigEntry<int>? AlertEnemyDetectionRange { get; private set; }
 
 	internal static void Initialize(ConfigFile config)
 	{
@@ -116,10 +116,10 @@ internal static class ConfigurationController
 		AlertEnemyDetectionRange = ConfigFile.Bind(
 			"LifeLeech",
 			nameof(AlertEnemyDetectionRange),
-			6.0f,
+			6,
 			new ConfigDescription(
-				"Maximum distance in meters between the player and the enemy for the enemy to detect and chase the player on attach/detach. If no player is within this range, or if the drone detaches naturally on full battery, the enemy is not alerted.",
-				new AcceptableValueRange<float>(2.0f, 20.0f)
+				"Maximum distance in meters (2 to 20 meters, integer) between the player and the enemy for the enemy to detect and chase the player on attach/detach. If no player is within this range, or if the drone detaches naturally on full battery, the enemy is not alerted.",
+				new AcceptableValueRange<int>(2, 20)
 			)
 		);
 
