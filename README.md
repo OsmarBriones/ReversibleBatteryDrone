@@ -1,17 +1,15 @@
 # ReversibleBatteryDrone
 
-Makes the charge drone reversible: 1st tap charges items, 2nd tap turns red to drain items, monsters, or players into battery life, 3rd tap shuts off. Fully configurable. Only Host, clients don't need it.
+Makes the charge drone reversible: each activation alternates between Charge Mode and Drain Mode (draining items, monsters, or players into battery life). Fully configurable. Truly Host-Only: clients do not need the mod installed.
 
 ## Features
 
-- **3-State Sequential Mode Cycling**: Use your standard interaction key (`E` by default) while holding the charge drone to easily cycle through states without extra keybinds:
-  - **With Battery**:
-    - **1st Tap**: Turns ON in **Charge Mode** (vanilla yellow beam & LED), charging low-battery items.
-    - **2nd Tap**: Switches to **Drain Mode** (vibrant red beam & LED), reversing energy flow.
-    - **3rd Tap**: Shuts the drone OFF completely.
-  - **When Completely Empty (0% Battery)**:
-    - **1st Tap**: Skips the unusable charge mode and turns ON directly in **Drain Mode** (Red), allowing you to immediately recharge the empty drone!
-    - **2nd Tap**: Shuts the drone OFF.
+- **Alternating Activation Mode**: Use your standard interaction key (`E` by default) while holding the charge drone to toggle it ON/OFF. Each activation cleanly alternates modes:
+  - **1st Activation**: Turns ON in **Charge Mode** (vanilla yellow beam & LED), charging low-battery items. Turn OFF when done.
+  - **2nd Activation**: Turns ON in **Drain Mode** (vibrant red beam & LED for modded clients), reversing energy flow to siphon batteries and leech monster/player health. Turn OFF when done.
+  - **Smart Battery Overrides**:
+    - **When Completely Empty (0% Battery)**: Automatically skips the unusable charge mode and activates directly in **Drain Mode** (Red), allowing you to immediately recharge the empty drone!
+    - **When Full (100% Battery)**: Automatically skips drain mode and activates directly in **Charge Mode**.
 - **Battery Siphoning & HUD Feedback**: In Drain mode, the drone attaches to items with remaining energy and siphons their power directly into its own battery. The target's floating battery HUD is visible during draining with visual feedback.
 - **Life Leeching**: If deployed near monsters or other players in Drain mode, the drone latches onto them, leeching small amounts of health over time and converting it into battery charge.
 - **Monster Aggression & Chase Alerts**: Attaching the drone to an enemy or detaching/removing it from them alerts the monster and triggers a direct chase against the responsible player (enabled by default, customizable).
@@ -20,7 +18,7 @@ Makes the charge drone reversible: 1st tap charges items, 2nd tap turns red to d
   - Items in the shop (`shopItem`) cannot be siphoned.
   - Non-rechargeable items (`isUnchargable`) cannot be siphoned.
   - Player stamina/energy is completely unaffected.
-- **Host-Only Multiplayer**: Only the host needs to install the mod; health and battery transfer mechanics execute on the host and automatically sync across all connected clients.
+- **100% Host-Only Multiplayer**: Only the host needs to install the mod! Drone AI, flight physics, battery transfers, and monster damage execute authoritatively on the host and synchronize across all connected clients. Clients with the mod installed also receive full visual effects (vibrant red beam & LEDs).
 - **Fully Configurable**: Easily tweak drain rates, monster/player damage per tick, health-to-battery conversion gain, and PvP friendly-fire toggles.
 
 ## Requirements

@@ -13,6 +13,7 @@ internal class ReversibleDroneController : MonoBehaviour
 	private PhotonView photonView = null!;
 
 	public DroneMode CurrentMode { get; private set; } = DroneMode.Charge;
+	public DroneMode NextActivationMode { get; private set; } = DroneMode.Charge;
 	public int DroneCycleState => (itemToggle != null && itemToggle.toggleState) ? (CurrentMode == DroneMode.Drain ? 2 : 1) : 0;
 
 	private Color originalDroneColor;
@@ -45,6 +46,11 @@ internal class ReversibleDroneController : MonoBehaviour
 			itemBattery.isUnchargable = false;
 		}
 
+		if (itemToggle != null)
+		{
+			itemToggle.onToggle.AddListener(OnItemToggled);
+		}
+
 		ReversibleBatteryDronePlugin.Logger?.LogInfo($"[ReversibleBatteryDrone] Controller Awake on ViewID: {photonView?.ViewID}, isMaster: {SemiFunc.IsMasterClientOrSingleplayer()}");
 	}
 
@@ -75,22 +81,10 @@ internal class ReversibleDroneController : MonoBehaviour
 			CacheOriginalColors();
 		}
 
-		// If drone was turned off externally (or by player action), reset mode to Charge
-		if (itemToggle != null)
+		// Track toggle state changes
+		if (itemToggle != null && previousToggleState != itemToggle.toggleState)
 		{
-			if (previousToggleState && !itemToggle.toggleState)
-			{
-				if (CurrentMode != DroneMode.Charge)
-				{
-					CurrentMode = DroneMode.Charge;
-					if (itemBattery != null && itemBattery.batteryLife <= 0.05f)
-					{
-						itemBattery.batteryLife = 0f;
-					}
-					UpdateVisuals();
-				}
-			}
-			previousToggleState = itemToggle.toggleState;
+			HandleToggleStateChange(itemToggle.toggleState);
 		}
 
 		// Keep tiny positive charge floor while in Drain mode so vanilla searching and sphere checks never abort
@@ -145,6 +139,11 @@ internal class ReversibleDroneController : MonoBehaviour
 
 	private void OnDestroy()
 	{
+		if (itemToggle != null)
+		{
+			itemToggle.onToggle.RemoveListener(OnItemToggled);
+		}
+
 		if (activeEnemyTarget != null)
 		{
 			bool isNaturalOrDistance = naturalFullChargeDetach || distanceBreakDetach;
@@ -159,48 +158,76 @@ internal class ReversibleDroneController : MonoBehaviour
 		}
 	}
 
-	public void HandleInteractPress()
+	private void OnItemToggled()
 	{
-		lastPlayerInteractTime = Time.time;
-
-		int player = SemiFunc.PhotonViewIDPlayerAvatarLocal();
-		bool hasCharge = itemBattery != null && itemBattery.batteryLife > 0.05f;
-
 		if (itemToggle == null) return;
+		HandleToggleStateChange(itemToggle.toggleState);
+	}
 
-		ReversibleBatteryDronePlugin.Logger?.LogInfo($"[ReversibleBatteryDrone] HandleInteractPress on ViewID: {photonView?.ViewID}. Mode: {CurrentMode}, ToggleState: {itemToggle.toggleState}, Battery: {itemBattery?.batteryLife:F1}%");
+	private void HandleToggleStateChange(bool newState)
+	{
+		if (previousToggleState == newState) return;
+		previousToggleState = newState;
 
-		if (!itemToggle.toggleState)
+		if (newState)
 		{
-			if (hasCharge)
+			// Drone was turned ON!
+			if (SemiFunc.IsMasterClientOrSingleplayer())
 			{
-				// 1st tap with charge: Turn ON in Charge mode (Yellow)
-				SetMode(DroneMode.Charge);
-				itemToggle.ToggleItem(true, player);
-			}
-			else
-			{
-				// 1st tap when empty (0% battery): Skip unusable charge mode and go directly to Drain mode (Red)!
-				SetMode(DroneMode.Drain);
-				itemToggle.ToggleItem(true, player);
-				PlayModeSwitchSound();
+				bool hasCharge = itemBattery != null && itemBattery.batteryLife > 0.05f;
+				bool isFull = itemBattery != null && itemBattery.batteryLife >= 99f;
+
+				DroneMode selectedMode;
+				if (!hasCharge)
+				{
+					// Drone empty -> Must siphon!
+					selectedMode = DroneMode.Drain;
+					NextActivationMode = DroneMode.Charge;
+				}
+				else if (isFull)
+				{
+					// Drone full -> Must charge!
+					selectedMode = DroneMode.Charge;
+					NextActivationMode = DroneMode.Drain;
+				}
+				else
+				{
+					// Alternate between Charge and Drain
+					selectedMode = NextActivationMode;
+					NextActivationMode = (selectedMode == DroneMode.Charge) ? DroneMode.Drain : DroneMode.Charge;
+				}
+
+				ReversibleBatteryDronePlugin.Logger?.LogInfo($"[ReversibleBatteryDrone] Drone turned ON on ViewID: {photonView?.ViewID}. Mode: {selectedMode}, NextActivationMode: {NextActivationMode}, Battery: {itemBattery?.batteryLife:F1}%");
+				SetMode(selectedMode);
 			}
 		}
 		else
 		{
-			if (CurrentMode == DroneMode.Charge)
+			// Drone was turned OFF!
+			ReversibleBatteryDronePlugin.Logger?.LogInfo($"[ReversibleBatteryDrone] Drone turned OFF on ViewID: {photonView?.ViewID}. Was Mode: {CurrentMode}, NextActivationMode: {NextActivationMode}");
+			if (CurrentMode == DroneMode.Drain)
 			{
-				// 2nd tap: Switch to Drain mode (Red)
-				SetMode(DroneMode.Drain);
-				PlayModeSwitchSound();
+				if (itemBattery != null && itemBattery.batteryLife <= 0.05f)
+				{
+					itemBattery.batteryLife = 0f;
+				}
 			}
-			else
-			{
-				// 3rd tap (or 2nd tap when empty): Turn OFF
-				SetMode(DroneMode.Charge); // reset mode for next activation
-				itemToggle.ToggleItem(false, player);
-			}
+			CurrentMode = DroneMode.Charge;
+			UpdateVisuals();
 		}
+	}
+
+	public void HandleInteractPress()
+	{
+		lastPlayerInteractTime = Time.time;
+		int player = SemiFunc.PhotonViewIDPlayerAvatarLocal();
+
+		if (itemToggle == null) return;
+
+		bool newToggle = !itemToggle.toggleState;
+		ReversibleBatteryDronePlugin.Logger?.LogInfo($"[ReversibleBatteryDrone] HandleInteractPress on ViewID: {photonView?.ViewID}. Toggling state to: {newToggle}");
+
+		itemToggle.ToggleItem(newToggle, player);
 	}
 
 	public void SetMode(DroneMode mode)
@@ -246,6 +273,8 @@ internal class ReversibleDroneController : MonoBehaviour
 					itemDrone.StateSet(ItemDrone.State.Searching);
 				}
 			}
+
+			PlayModeSwitchSound();
 		}
 		else
 		{
@@ -256,7 +285,14 @@ internal class ReversibleDroneController : MonoBehaviour
 
 			if (SemiFunc.IsMasterClientOrSingleplayer() && itemToggle != null && itemToggle.toggleState)
 			{
-				if (itemDrone != null && (itemDrone.currentState == ItemDrone.State.BeamDeployed || itemDrone.currentState == ItemDrone.State.Attached))
+				if (itemDrone != null && (itemDrone.currentState == ItemDrone.State.Off || itemDrone.currentState == ItemDrone.State.NoBattery))
+				{
+					if (itemBattery != null && itemBattery.batteryLife > 0.05f)
+					{
+						itemDrone.StateSet(ItemDrone.State.Searching);
+					}
+				}
+				else if (itemDrone != null && (itemDrone.currentState == ItemDrone.State.BeamDeployed || itemDrone.currentState == ItemDrone.State.Attached))
 				{
 					if (itemDrone.magnetActive)
 					{

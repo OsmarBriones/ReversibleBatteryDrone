@@ -21,19 +21,21 @@ This document describes the runtime structure, data flow, and design decisions f
   - Caches original colors (yellow beam, yellow emission, light).
   - Also refreshed in `ReversibleDroneController.Awake()`.
 
-### 2. 3-State Sequential Interaction & Empty Battery Handling
-- **`ItemToggle_Update_Patch`** (Prefix on `ItemToggle.Update`):
-  - Checks if `physGrabObject.heldByLocalPlayer` and `SemiFunc.InputDown(InputKey.Interact)` (`E`).
-  - Calls `ReversibleDroneController.HandleInteractPress()`:
-    - **When Drone Has Charge**:
-      - **From Off (0) -> Charge (1)**: Calls `itemToggle.ToggleItem(true)`, sets mode to `Charge`, beam & LED yellow.
-      - **From Charge (1) -> Drain (2)**: Keeps drone active, switches mode to `Drain`, beam & LED red.
-      - **From Drain (2) -> Off (0)**: Calls `itemToggle.ToggleItem(false)`, resets mode to `Charge`.
-    - **When Drone Is Empty (0% Battery)**:
-      - **From Off (0) -> Drain (2)**: Immediately skips unusable Charge mode and turns ON in `Drain` mode (Red), allowing direct recharging.
-      - **From Drain (2) -> Off (0)**: Shuts drone OFF.
-  - Returns `false` to skip vanilla toggle logic.
-- **Empty Battery Lifecyle & Patches**:
+### 2. Alternating Activation Mode & Host-Only Authority
+- **Interaction Model**:
+  - The drone uses the game's native binary toggle (`ItemToggle.ToggleItem(true)` to turn ON, `ToggleItem(false)` to turn OFF).
+  - Each time the drone is turned ON, the host (`SemiFunc.IsMasterClientOrSingleplayer()`) selects the mode:
+    - **1st Activation**: Activates in **Charge Mode** (vanilla yellow beam & LEDs).
+    - **2nd Activation**: Activates in **Drain Mode** (vibrant red beam & LEDs for modded clients).
+    - Alternates back and forth cleanly without requiring RPC overrides or packet bouncing.
+  - **Smart Battery Overrides**:
+    - **When Empty (`batteryLife <= 5%`)**: Automatically skips Charge mode and activates directly in **Drain Mode**, allowing immediate siphoning.
+    - **When Full (`batteryLife >= 99%`)**: Automatically skips Drain mode and activates directly in **Charge Mode**.
+- **Unified Toggle Lifecycle**:
+  - `itemToggle.onToggle` and `ReversibleDroneController.Update()` route through `HandleToggleStateChange(bool newState)`.
+  - On activation (`newState == true`), the MasterClient selects the mode, calls `SetMode(selectedMode)`, and dispatches `SetModeRPC` to synchronize clients.
+  - On deactivation (`newState == false`), the drone cleanly shuts down, resets the mode to `Charge`, and clears any temporary battery floors.
+- **Empty Battery Lifecycle & Patches**:
   - **`ItemDrone_StateOff_Patch`**: When toggled ON in Drain mode while empty, transitions `ItemDrone` from `State.Off` to `State.Searching`.
   - **`ItemDrone_StateSet_Patch`**: Intercepts `ItemDrone.StateSet` and suppresses transitions to `State.NoBattery` when `CurrentMode == DroneMode.Drain`.
   - **Virtual Floor (`0.001f`)**: While empty in Drain mode, a tiny floor (`0.001f`) is maintained in `ReversibleDroneController.Update()` so vanilla `SphereCheck()` and `TargetFindPlayer()` execute without early exit. Renders visually as 0 bars.
