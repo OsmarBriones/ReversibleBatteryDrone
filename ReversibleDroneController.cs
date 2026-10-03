@@ -44,6 +44,8 @@ internal class ReversibleDroneController : MonoBehaviour
 		{
 			itemBattery.isUnchargable = false;
 		}
+
+		ReversibleBatteryDronePlugin.Logger?.LogInfo($"[ReversibleBatteryDrone] Controller Awake on ViewID: {photonView?.ViewID}, isMaster: {SemiFunc.IsMasterClientOrSingleplayer()}");
 	}
 
 	private void Start()
@@ -166,6 +168,8 @@ internal class ReversibleDroneController : MonoBehaviour
 
 		if (itemToggle == null) return;
 
+		ReversibleBatteryDronePlugin.Logger?.LogInfo($"[ReversibleBatteryDrone] HandleInteractPress on ViewID: {photonView?.ViewID}. Mode: {CurrentMode}, ToggleState: {itemToggle.toggleState}, Battery: {itemBattery?.batteryLife:F1}%");
+
 		if (!itemToggle.toggleState)
 		{
 			if (hasCharge)
@@ -201,6 +205,7 @@ internal class ReversibleDroneController : MonoBehaviour
 
 	public void SetMode(DroneMode mode)
 	{
+		ReversibleBatteryDronePlugin.Logger?.LogInfo($"[ReversibleBatteryDrone] SetMode({mode}) called on ViewID: {photonView?.ViewID}. Multiplayer: {GameManager.Multiplayer()}");
 		if (GameManager.Multiplayer() && photonView != null && photonView.ViewID != 0)
 		{
 			photonView.RPC(nameof(SetModeRPC), RpcTarget.All, (int)mode);
@@ -216,6 +221,7 @@ internal class ReversibleDroneController : MonoBehaviour
 	{
 		CurrentMode = (DroneMode)mode;
 		lastPlayerInteractTime = Time.time;
+		ReversibleBatteryDronePlugin.Logger?.LogInfo($"[ReversibleBatteryDrone] SetModeRPC({(DroneMode)mode}) received on ViewID: {photonView?.ViewID}. isMaster: {SemiFunc.IsMasterClientOrSingleplayer()}");
 
 		if (CurrentMode == DroneMode.Drain)
 		{
@@ -279,6 +285,39 @@ internal class ReversibleDroneController : MonoBehaviour
 			itemDrone.lineBetweenTwoPoints.SetColor(activeBeam);
 		}
 
+		if (itemDrone.onSwitchTransform != null)
+		{
+			Renderer r = itemDrone.onSwitchTransform.GetComponent<Renderer>();
+			if (r != null && r.material != null)
+			{
+				r.material.SetColor("_EmissionColor", activeColor);
+			}
+		}
+
+		if (itemDrone.dronePyramidTransforms != null)
+		{
+			foreach (var pyr in itemDrone.dronePyramidTransforms)
+			{
+				if (pyr != null)
+				{
+					Renderer r = pyr.GetComponent<Renderer>();
+					if (r != null && r.material != null)
+					{
+						r.material.SetColor("_EmissionColor", activeColor);
+					}
+				}
+			}
+		}
+
+		if (itemDrone.droneTransform != null)
+		{
+			Renderer r = itemDrone.droneTransform.GetComponent<Renderer>();
+			if (r != null && r.material != null)
+			{
+				r.material.SetColor("_EmissionColor", activeColor);
+			}
+		}
+
 		Transform iconTransform = transform.Find("Drone Icon");
 		if (iconTransform != null)
 		{
@@ -294,6 +333,8 @@ internal class ReversibleDroneController : MonoBehaviour
 		{
 			light.itemLight.color = activeColor;
 		}
+
+		ReversibleBatteryDronePlugin.Logger?.LogInfo($"[ReversibleBatteryDrone] UpdateVisuals on ViewID: {photonView?.ViewID}. Mode: {CurrentMode}, activeBeam: {(CurrentMode == DroneMode.Drain ? "RED" : "YELLOW")}");
 	}
 
 	private void PlayModeSwitchSound()
