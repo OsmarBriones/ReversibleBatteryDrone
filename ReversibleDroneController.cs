@@ -33,6 +33,11 @@ internal class ReversibleDroneController : MonoBehaviour
 		itemToggle = GetComponent<ItemToggle>();
 		physGrabObject = GetComponent<PhysGrabObject>();
 		photonView = GetComponent<PhotonView>();
+
+		if (itemBattery != null)
+		{
+			itemBattery.isUnchargable = false;
+		}
 	}
 
 	private void Start()
@@ -557,40 +562,39 @@ internal class ReversibleDroneController : MonoBehaviour
 
 		if (targetBattery != null && targetBattery != itemBattery)
 		{
+			// Target item visual feedback (floating HUD with drain animation)
 			targetBattery.OverrideBatteryShow(0.25f);
-			var visualLogic = targetBattery.GetComponentInChildren<BatteryVisualLogic>();
-			if (visualLogic != null)
+			var targetVisualLogic = targetBattery.GetComponentInChildren<BatteryVisualLogic>();
+			if (targetVisualLogic != null)
 			{
-				visualLogic.OverrideBatteryDrain(0.25f);
+				targetVisualLogic.OverrideBatteryDrain(0.25f);
 			}
 
+			// Drone visual feedback (floating HUD with charging animation)
 			itemBattery.OverrideBatteryShow(0.25f);
+			var droneVisualLogic = itemBattery.GetComponentInChildren<BatteryVisualLogic>();
+			if (droneVisualLogic != null)
+			{
+				droneVisualLogic.OverrideBatteryCharge(0.25f);
+			}
 
 			float rate = ConfigurationController.TargetBatteryDrainPercentPerSecond?.Value ?? 25f;
-			float transferAmount = rate * Time.deltaTime;
 
-			transferAmount = Mathf.Min(transferAmount, targetBattery.batteryLife);
-			float droneNeeded = Mathf.Max(0f, 100f - itemBattery.batteryLife);
-			transferAmount = Mathf.Min(transferAmount, droneNeeded);
+			// Use the native game engine charging and draining pipeline
+			targetBattery.Drain(rate);
+			itemBattery.ChargeBattery(targetBattery.gameObject, rate);
 
-			if (transferAmount > 0f)
-			{
-				targetBattery.batteryLife = Mathf.Clamp(targetBattery.batteryLife - transferAmount, 0f, 100f);
-				itemBattery.batteryLife = Mathf.Clamp(itemBattery.batteryLife + transferAmount, 0f, 100f);
-
-				targetBattery.TryVisualUpdate();
-				itemBattery.TryVisualUpdate();
-			}
-
+			// Detach if target is completely drained or drone reached full capacity
 			if (targetBattery.batteryLife <= 0.05f)
 			{
 				targetBattery.batteryLife = 0f;
 				targetBattery.SetBatteryLife(0);
 				itemDrone.MagnetActiveToggle(toggleBool: false);
 			}
-			else if (itemBattery.batteryLife >= 99.5f)
+			else if (itemBattery.batteryLife >= 99f)
 			{
 				itemBattery.batteryLife = 100f;
+				naturalFullChargeDetach = true;
 				itemDrone.MagnetActiveToggle(toggleBool: false);
 			}
 			return;
@@ -617,6 +621,11 @@ internal class ReversibleDroneController : MonoBehaviour
 			}
 
 			itemBattery.OverrideBatteryShow(0.25f);
+			var droneVisualLogic = itemBattery.GetComponentInChildren<BatteryVisualLogic>();
+			if (droneVisualLogic != null)
+			{
+				droneVisualLogic.OverrideBatteryCharge(0.25f);
+			}
 
 			tickTimer += Time.deltaTime;
 			float tickRate = ConfigurationController.LeechTickIntervalSeconds?.Value ?? 0.5f;
@@ -627,12 +636,11 @@ internal class ReversibleDroneController : MonoBehaviour
 				float gain = ConfigurationController.DroneBatteryGainPercentPerTick?.Value ?? 1f;
 
 				enemyHealth.Hurt(dmg, Vector3.up * 0.1f);
-				itemBattery.batteryLife = Mathf.Clamp(itemBattery.batteryLife + gain, 0f, 100f);
-				itemBattery.TryVisualUpdate();
+				itemBattery.ChargeBattery(enemyParent.gameObject, gain * (1f / Mathf.Max(0.01f, tickRate)));
 
-				if (enemyHealth.dead || enemyHealth.healthCurrent <= 0 || itemBattery.batteryLife >= 99.5f)
+				if (enemyHealth.dead || enemyHealth.healthCurrent <= 0 || itemBattery.batteryLife >= 99f)
 				{
-					if (itemBattery.batteryLife >= 99.5f)
+					if (itemBattery.batteryLife >= 99f)
 					{
 						naturalFullChargeDetach = true;
 					}
@@ -658,6 +666,11 @@ internal class ReversibleDroneController : MonoBehaviour
 			}
 
 			itemBattery.OverrideBatteryShow(0.25f);
+			var droneVisualLogic = itemBattery.GetComponentInChildren<BatteryVisualLogic>();
+			if (droneVisualLogic != null)
+			{
+				droneVisualLogic.OverrideBatteryCharge(0.25f);
+			}
 
 			tickTimer += Time.deltaTime;
 			float tickRate = ConfigurationController.LeechTickIntervalSeconds?.Value ?? 0.5f;
@@ -668,11 +681,14 @@ internal class ReversibleDroneController : MonoBehaviour
 				float gain = ConfigurationController.DroneBatteryGainPercentPerTick?.Value ?? 1f;
 
 				player.playerHealth.HurtOther(dmg, Vector3.zero, false);
-				itemBattery.batteryLife = Mathf.Clamp(itemBattery.batteryLife + gain, 0f, 100f);
-				itemBattery.TryVisualUpdate();
+				itemBattery.ChargeBattery(player.gameObject, gain * (1f / Mathf.Max(0.01f, tickRate)));
 
-				if (player.deadSet || player.playerHealth.health <= 0 || itemBattery.batteryLife >= 99.5f)
+				if (player.deadSet || player.playerHealth.health <= 0 || itemBattery.batteryLife >= 99f)
 				{
+					if (itemBattery.batteryLife >= 99f)
+					{
+						naturalFullChargeDetach = true;
+					}
 					itemDrone.MagnetActiveToggle(toggleBool: false);
 				}
 			}

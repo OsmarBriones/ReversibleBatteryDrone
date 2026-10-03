@@ -55,10 +55,10 @@ This document describes the runtime structure, data flow, and design decisions f
     - Checks `SemiFunc.IsMasterClientOrSingleplayer()`.
     - Applies `OverrideZeroGravity()`, `OverrideDrag(1f)`, `OverrideAngularDrag(10f)`.
     - When `itemDrone.magnetActive` is true, calls `controller.ExecuteDrain()`:
-      - **Item Siphoning**: Direct conservative 1:1 transfer. Clamps transfer to target's available battery and drone's missing battery.
-      - **Target HUD Feedback**: Calls `targetBattery.OverrideBatteryShow(0.25f)` and `visualLogic.OverrideBatteryDrain(0.25f)` every frame so the item's floating HUD and drain animation are prominently displayed.
-      - **Life Leeching**: Deals flat HP damage (`MonsterDamageFlatHpPerTick` / `PlayerDamageFlatHpPerTick`) and increments drone battery (`DroneBatteryGainPercentPerTick`) on interval ticks.
-      - Detaches via `itemDrone.MagnetActiveToggle(false)` once drone reaches full battery (`>= 99.5%`) or target has no health/battery left.
+      - **Item Siphoning**: Direct conservative energy transfer utilizing native `itemBattery.ChargeBattery(target, rate)` and `targetBattery.Drain(rate)`.
+      - **Dual HUD Visual Feedback**: Calls `targetBattery.OverrideBatteryShow(0.25f)` + `visualLogic.OverrideBatteryDrain(0.25f)` on the item and `itemBattery.OverrideBatteryShow(0.25f)` + `droneVisualLogic.OverrideBatteryCharge(0.25f)` on the drone so both HUDs and pulsing animations are simultaneously visible.
+      - **Life Leeching**: Deals flat HP damage (`MonsterDamageFlatHpPerTick` / `PlayerDamageFlatHpPerTick`) and increments drone battery via `itemBattery.ChargeBattery()` on interval ticks.
+      - Detaches via `itemDrone.MagnetActiveToggle(false)` once drone reaches full battery (`>= 99%`) or target has no health/battery left.
 
 ### 5. Monster Aggro & Chase Lifecycle
 - **Attach Aggro**: When `FindDrainTarget()` locks onto an enemy target (`targetType == 2`), `NotifyEnemyOfPlayer(ep, isAttach: true)` is triggered, but only if the player is holding the drone or within `AlertEnemyDetectionRange` (default 6m) of the monster.
