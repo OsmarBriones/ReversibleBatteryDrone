@@ -14,5 +14,8 @@ internal static class ItemDroneBattery_Start_Patch
 		{
 			__instance.gameObject.AddComponent<ReversibleDroneController>();
 		}
+
+		var pv = __instance.GetComponent<Photon.Pun.PhotonView>();
+		pv?.RefreshRpcMonoBehaviourCache();
 	}
 }

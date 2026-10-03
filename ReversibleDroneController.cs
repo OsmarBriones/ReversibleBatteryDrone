@@ -13,7 +13,7 @@ internal class ReversibleDroneController : MonoBehaviour
 	private PhotonView photonView = null!;
 
 	public DroneMode CurrentMode { get; private set; } = DroneMode.Charge;
-	public int DroneCycleState { get; private set; } = 0; // 0 = Off, 1 = Charge, 2 = Drain
+	public int DroneCycleState => (itemToggle != null && itemToggle.toggleState) ? (CurrentMode == DroneMode.Drain ? 2 : 1) : 0;
 
 	private Color originalDroneColor;
 	private Color originalBeamColor;
@@ -24,6 +24,7 @@ internal class ReversibleDroneController : MonoBehaviour
 	private bool naturalFullChargeDetach;
 	private bool distanceBreakDetach;
 	private float lastPlayerInteractTime = -999f;
+	private bool previousToggleState;
 
 	private void Awake()
 	{
@@ -33,6 +34,11 @@ internal class ReversibleDroneController : MonoBehaviour
 		itemToggle = GetComponent<ItemToggle>();
 		physGrabObject = GetComponent<PhysGrabObject>();
 		photonView = GetComponent<PhotonView>();
+
+		if (photonView != null)
+		{
+			photonView.RefreshRpcMonoBehaviourCache();
+		}
 
 		if (itemBattery != null)
 		{
@@ -67,16 +73,22 @@ internal class ReversibleDroneController : MonoBehaviour
 			CacheOriginalColors();
 		}
 
-		// If drone was turned off externally or ran out of battery, reset state
-		if (itemToggle != null && !itemToggle.toggleState && DroneCycleState != 0)
+		// If drone was turned off externally (or by player action), reset mode to Charge
+		if (itemToggle != null)
 		{
-			DroneCycleState = 0;
-			CurrentMode = DroneMode.Charge;
-			if (itemBattery != null && itemBattery.batteryLife <= 0.05f)
+			if (previousToggleState && !itemToggle.toggleState)
 			{
-				itemBattery.batteryLife = 0f;
+				if (CurrentMode != DroneMode.Charge)
+				{
+					CurrentMode = DroneMode.Charge;
+					if (itemBattery != null && itemBattery.batteryLife <= 0.05f)
+					{
+						itemBattery.batteryLife = 0f;
+					}
+					UpdateVisuals();
+				}
 			}
-			UpdateVisuals();
+			previousToggleState = itemToggle.toggleState;
 		}
 
 		// Keep tiny positive charge floor while in Drain mode so vanilla searching and sphere checks never abort
@@ -149,44 +161,41 @@ internal class ReversibleDroneController : MonoBehaviour
 	{
 		lastPlayerInteractTime = Time.time;
 
-		// 3-state cycle:
-		// State 0 (Off) -> State 1 (Charge)
-		// State 1 (Charge) -> State 2 (Drain)
-		// State 2 (Drain) -> State 0 (Off)
 		int player = SemiFunc.PhotonViewIDPlayerAvatarLocal();
 		bool hasCharge = itemBattery != null && itemBattery.batteryLife > 0.05f;
 
-		if (DroneCycleState == 0)
+		if (itemToggle == null) return;
+
+		if (!itemToggle.toggleState)
 		{
 			if (hasCharge)
 			{
 				// 1st tap with charge: Turn ON in Charge mode (Yellow)
-				DroneCycleState = 1;
 				SetMode(DroneMode.Charge);
 				itemToggle.ToggleItem(true, player);
 			}
 			else
 			{
 				// 1st tap when empty (0% battery): Skip unusable charge mode and go directly to Drain mode (Red)!
-				DroneCycleState = 2;
 				SetMode(DroneMode.Drain);
 				itemToggle.ToggleItem(true, player);
 				PlayModeSwitchSound();
 			}
 		}
-		else if (DroneCycleState == 1)
-		{
-			// 2nd tap: Switch to Drain mode (Red)
-			DroneCycleState = 2;
-			SetMode(DroneMode.Drain);
-			PlayModeSwitchSound();
-		}
 		else
 		{
-			// 3rd tap (or 2nd tap when empty): Turn OFF
-			DroneCycleState = 0;
-			SetMode(DroneMode.Charge); // reset for next activation
-			itemToggle.ToggleItem(false, player);
+			if (CurrentMode == DroneMode.Charge)
+			{
+				// 2nd tap: Switch to Drain mode (Red)
+				SetMode(DroneMode.Drain);
+				PlayModeSwitchSound();
+			}
+			else
+			{
+				// 3rd tap (or 2nd tap when empty): Turn OFF
+				SetMode(DroneMode.Charge); // reset mode for next activation
+				itemToggle.ToggleItem(false, player);
+			}
 		}
 	}
 
@@ -206,22 +215,52 @@ internal class ReversibleDroneController : MonoBehaviour
 	public void SetModeRPC(int mode)
 	{
 		CurrentMode = (DroneMode)mode;
+		lastPlayerInteractTime = Time.time;
+
 		if (CurrentMode == DroneMode.Drain)
 		{
-			DroneCycleState = 2;
 			if (itemBattery != null && itemBattery.batteryLife <= 0.05f)
 			{
 				itemBattery.batteryLife = 0.001f;
 			}
-		}
-		else if (itemToggle != null && itemToggle.toggleState)
-		{
-			DroneCycleState = 1;
+
+			// If MasterClient and already toggled on, ensure we transition into searching
+			if (SemiFunc.IsMasterClientOrSingleplayer() && itemToggle != null && itemToggle.toggleState)
+			{
+				if (itemDrone != null && (itemDrone.currentState == ItemDrone.State.Off || itemDrone.currentState == ItemDrone.State.NoBattery))
+				{
+					itemDrone.StateSet(ItemDrone.State.Searching);
+				}
+				else if (itemDrone != null && (itemDrone.currentState == ItemDrone.State.BeamDeployed || itemDrone.currentState == ItemDrone.State.Attached))
+				{
+					if (itemDrone.magnetActive)
+					{
+						itemDrone.MagnetActiveToggle(false);
+					}
+					itemDrone.StateSet(ItemDrone.State.Searching);
+				}
+			}
 		}
 		else
 		{
-			DroneCycleState = 0;
+			if (itemBattery != null && itemBattery.batteryLife <= 0.05f)
+			{
+				itemBattery.batteryLife = 0f;
+			}
+
+			if (SemiFunc.IsMasterClientOrSingleplayer() && itemToggle != null && itemToggle.toggleState)
+			{
+				if (itemDrone != null && (itemDrone.currentState == ItemDrone.State.BeamDeployed || itemDrone.currentState == ItemDrone.State.Attached))
+				{
+					if (itemDrone.magnetActive)
+					{
+						itemDrone.MagnetActiveToggle(false);
+					}
+					itemDrone.StateSet(ItemDrone.State.Searching);
+				}
+			}
 		}
+
 		UpdateVisuals();
 	}
 
@@ -467,9 +506,21 @@ internal class ReversibleDroneController : MonoBehaviour
 			itemDrone.playerTumbleTarget = null;
 
 			Vector3 attachPos = targetBattery.transform.position;
-			PhotonView? pv = targetBattery.GetComponent<PhotonView>();
+			PhysGrabObject? pgo = targetBattery.GetComponent<PhysGrabObject>() ?? targetBattery.GetComponentInParent<PhysGrabObject>();
+			int colliderId = 0;
+			Transform targetTransform = targetBattery.transform;
+			if (pgo != null && pgo.colliders != null && pgo.colliders.Count > 0)
+			{
+				var pgc = pgo.colliders[0].GetComponent<PhysGrabObjectCollider>();
+				if (pgc != null)
+				{
+					colliderId = pgc.colliderID;
+					targetTransform = pgo.colliders[0];
+				}
+			}
+			PhotonView? pv = pgo != null && pgo.photonView != null ? pgo.photonView : targetBattery.GetComponent<PhotonView>();
 			int viewId = pv != null ? pv.ViewID : 0;
-			itemDrone.NewRayHitPoint(attachPos, viewId, -1, targetBattery.transform);
+			itemDrone.NewRayHitPoint(attachPos, viewId, colliderId, targetTransform);
 			if (itemDrone.rayHitPosition == Vector3.zero) itemDrone.rayHitPosition = new Vector3(0f, 0.05f, 0f);
 			itemDrone.attachPoint = itemDrone.rayHitPosition;
 			return true;
@@ -491,8 +542,21 @@ internal class ReversibleDroneController : MonoBehaviour
 			itemDrone.magnetTargetRigidbody = ep.Enemy.Rigidbody != null ? ep.Enemy.Rigidbody.rb : ep.GetComponent<Rigidbody>();
 
 			Vector3 attachPos = enemyCenter.position + Vector3.up * 0.1f;
-			int viewId = ep.Enemy.PhotonView != null ? ep.Enemy.PhotonView.ViewID : 0;
-			itemDrone.NewRayHitPoint(attachPos, viewId, -1, enemyCenter);
+			PhysGrabObject? pgo = itemDrone.magnetTargetPhysGrabObject;
+			int colliderId = 0;
+			Transform targetTransform = enemyCenter;
+			if (pgo != null && pgo.colliders != null && pgo.colliders.Count > 0)
+			{
+				var pgc = pgo.colliders[0].GetComponent<PhysGrabObjectCollider>();
+				if (pgc != null)
+				{
+					colliderId = pgc.colliderID;
+					targetTransform = pgo.colliders[0];
+				}
+			}
+			PhotonView? pv = pgo != null && pgo.photonView != null ? pgo.photonView : (ep.Enemy.PhotonView != null ? ep.Enemy.PhotonView : ep.GetComponent<PhotonView>());
+			int viewId = pv != null ? pv.ViewID : 0;
+			itemDrone.NewRayHitPoint(attachPos, viewId, colliderId, targetTransform);
 			if (itemDrone.rayHitPosition == Vector3.zero) itemDrone.rayHitPosition = new Vector3(0f, 0.05f, 0f);
 			itemDrone.attachPoint = itemDrone.rayHitPosition;
 

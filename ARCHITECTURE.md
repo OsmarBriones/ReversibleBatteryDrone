@@ -14,10 +14,12 @@ This document describes the runtime structure, data flow, and design decisions f
 
 ## Main Data Flow
 
-### 1. Initialization
+### 1. Initialization & Networking Cache
 - **`ItemDroneBattery_Start_Patch`** (Postfix on `ItemDroneBattery.Start`):
   - Automatically attaches the `ReversibleDroneController` MonoBehaviour component to the drone GameObject.
+  - Calls `PhotonView.RefreshRpcMonoBehaviourCache()` so PUN 2 registers runtime-added RPCs (`SetModeRPC`) on both host and clients.
   - Caches original colors (yellow beam, yellow emission, light).
+  - Also refreshed in `ReversibleDroneController.Awake()`.
 
 ### 2. 3-State Sequential Interaction & Empty Battery Handling
 - **`ItemToggle_Update_Patch`** (Prefix on `ItemToggle.Update`):
@@ -42,7 +44,7 @@ This document describes the runtime structure, data flow, and design decisions f
   - When in `Drain` mode, intercepts `StateSearching` and delegates to `ReversibleDroneController.CustomStateSearching()`:
     - Scans a 3.5m radius for batteries, living monsters (`EnemyParent`), and living players (`PlayerAvatar`).
     - Excludes the player currently holding the drone so it can be held and aimed.
-    - Connects to the closest valid target, establishing `magnetTarget` and a valid `rayHitPosition` (avoiding NRE in `DrawBeamLine`).
+    - Connects to the closest valid target, establishing `magnetTarget` and a valid `rayHitPosition` with synchronized `colliderID` and `viewID` across all network clients (avoiding NRE in `NewRayHitPointLogic` and `DrawBeamLine`).
 - **`ItemDrone_CheckTargetDeath_Patch`** (Prefix on `ItemDrone.CheckTargetDeath`):
   - Prevents vanilla `CheckTargetDeath` from prematurely turning off the drone if `enemyTarget.Spawned` is false in custom spawn setups.
 - **Anti-Exploits**:
