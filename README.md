@@ -1,6 +1,16 @@
 # ReversibleBatteryDrone
 
-Makes the charge drone reversible: each activation alternates between Charge Mode and Drain Mode (draining items, monsters, or players into battery life). Fully configurable. Truly Host-Only: clients do not need the mod installed.
+Makes the charge drone reversible: each activation alternates between Charge Mode and Drain Mode (draining items, monsters, or players into battery life). Fully configurable.
+
+> [!NOTE]
+> ### 👥 Multiplayer: Only Host Needed (Clients Optional)
+> **Your friends do NOT need to install this mod to join and play!**
+> 
+> * **For Clients WITHOUT the mod (Vanilla):**
+>   * ✅ 100% full gameplay (draining batteries, monster damage, aggro chase, smart overrides, and alternating toggles).
+>   * ℹ️ The laser beam displays in the game's default yellow color.
+> * **For Clients WITH the mod (Enhanced):**
+>   * ✅ Full gameplay + **vibrant red laser beam**, red LED indicators, and custom audio cues.
 
 ## Features
 

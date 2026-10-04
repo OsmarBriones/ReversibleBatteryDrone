@@ -2,7 +2,7 @@
     "name":  "ReversibleBatteryDrone",
     "version_number":  "1.0.0",
     "website_url":  "https://github.com/OsmarBriones/ReversibleBatteryDrone",
-    "description":  "Makes the charge drone reversible: 1st tap charges items, 2nd tap turns red to drain items, monsters, or players into battery life, 3rd tap shuts off. Fully configurable. Only Host, clients don\u0027t need it.",
+    "description":  "Makes the charge drone reversible (Charge/Drain). Only Host needed (clients can optionally install for red beam visuals). Fully configurable.",
     "dependencies":  [
                          "BepInEx-BepInExPack-5.4.2304"
                      ]
