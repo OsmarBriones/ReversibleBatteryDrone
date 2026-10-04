@@ -8,7 +8,7 @@ namespace ReversibleBatteryDrone
 	[BepInPlugin(PluginGuid, PluginName, PluginVersion)]
 	public class ReversibleBatteryDronePlugin : BaseUnityPlugin
 	{
-		// Se reemplaza com.osmar por el parámetro AuthorId del template.json
+		// Se reemplaza com.osmar por el parÃ¡metro AuthorId del template.json
 		// y ReversibleBatteryDrone por el nombre del proyecto (sourceName).
 		public const string PluginGuid = "com.osmar.ReversibleBatteryDrone";
 		public const string PluginName = "ReversibleBatteryDrone";
