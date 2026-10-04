@@ -21,6 +21,7 @@ Makes the charge drone reversible: each activation alternates between Charge Mod
     - **When Completely Empty (0% Battery)**: Automatically skips the unusable charge mode and activates directly in **Drain Mode** (Red), allowing you to immediately recharge the empty drone!
     - **When Full (100% Battery)**: Automatically skips drain mode and activates directly in **Charge Mode**.
 - **Battery Siphoning & HUD Feedback**: In Drain mode, the drone attaches to items with remaining energy and siphons their power directly into its own battery. The target's floating battery HUD is visible during draining with visual feedback.
+- **Dynamic In-Hand HUD Prompts**: When holding the drone, the on-screen interaction prompt dynamically updates to reflect the active or upcoming mode (`"Recharge Droid [E]"` vs. `"Drain Droid [E]"`), giving immediate visual clarity before activating.
 - **Life Leeching**: If deployed near monsters or other players in Drain mode, the drone latches onto them, leeching small amounts of health over time and converting it into battery charge.
 - **Monster Aggression & Chase Alerts**: Attaching the drone to an enemy or detaching/removing it from them alerts the monster and triggers a direct chase against the responsible player (enabled by default, customizable).
 - **Anti-Exploit & Energy Conservation**:
