@@ -172,31 +172,31 @@ internal class ReversibleDroneController : MonoBehaviour
 		if (newState)
 		{
 			// Drone was turned ON!
+			bool hasCharge = itemBattery != null && itemBattery.batteryLife > 0.05f;
+			bool isFull = itemBattery != null && itemBattery.batteryLife >= 99f;
+
+			DroneMode selectedMode;
+			if (!hasCharge)
+			{
+				// Drone empty -> Must siphon!
+				selectedMode = DroneMode.Drain;
+				NextActivationMode = DroneMode.Charge;
+			}
+			else if (isFull)
+			{
+				// Drone full -> Must charge!
+				selectedMode = DroneMode.Charge;
+				NextActivationMode = DroneMode.Drain;
+			}
+			else
+			{
+				// Alternate between Charge and Drain
+				selectedMode = NextActivationMode;
+				NextActivationMode = (selectedMode == DroneMode.Charge) ? DroneMode.Drain : DroneMode.Charge;
+			}
+
 			if (SemiFunc.IsMasterClientOrSingleplayer())
 			{
-				bool hasCharge = itemBattery != null && itemBattery.batteryLife > 0.05f;
-				bool isFull = itemBattery != null && itemBattery.batteryLife >= 99f;
-
-				DroneMode selectedMode;
-				if (!hasCharge)
-				{
-					// Drone empty -> Must siphon!
-					selectedMode = DroneMode.Drain;
-					NextActivationMode = DroneMode.Charge;
-				}
-				else if (isFull)
-				{
-					// Drone full -> Must charge!
-					selectedMode = DroneMode.Charge;
-					NextActivationMode = DroneMode.Drain;
-				}
-				else
-				{
-					// Alternate between Charge and Drain
-					selectedMode = NextActivationMode;
-					NextActivationMode = (selectedMode == DroneMode.Charge) ? DroneMode.Drain : DroneMode.Charge;
-				}
-
 				ReversibleBatteryDronePlugin.Logger?.LogInfo($"[ReversibleBatteryDrone] Drone turned ON on ViewID: {photonView?.ViewID}. Mode: {selectedMode}, NextActivationMode: {NextActivationMode}, Battery: {itemBattery?.batteryLife:F1}%");
 				SetMode(selectedMode);
 			}
@@ -215,6 +215,31 @@ internal class ReversibleDroneController : MonoBehaviour
 			CurrentMode = DroneMode.Charge;
 			UpdateVisuals();
 		}
+	}
+
+	public DroneMode GetAnticipatedActivationMode()
+	{
+		bool hasCharge = itemBattery != null && itemBattery.batteryLife > 0.05f;
+		bool isFull = itemBattery != null && itemBattery.batteryLife >= 99f;
+
+		if (!hasCharge)
+		{
+			return DroneMode.Drain;
+		}
+		if (isFull)
+		{
+			return DroneMode.Charge;
+		}
+		return NextActivationMode;
+	}
+
+	public DroneMode GetEffectiveModeForDisplay()
+	{
+		if (itemToggle != null && itemToggle.toggleState)
+		{
+			return CurrentMode;
+		}
+		return GetAnticipatedActivationMode();
 	}
 
 	public void HandleInteractPress()

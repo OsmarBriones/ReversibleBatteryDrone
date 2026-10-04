@@ -14,6 +14,6 @@
     - **Categoría 3 (Híbrido Asimétrico / Graceful Degradation):** Jugabilidad y mecánicas 100% funcionales en Host-Only con fallback visual; efectos audiovisuales completos en clientes con mod.
 
 ## 2. Ajustes en ReversibleBatteryDrone
-- [ ] **Etiqueta dinámica en mano (In-hand prompt label):**
+- [x] **Etiqueta dinámica en mano (In-hand prompt label):**
   - Modificar el texto mostrado en pantalla cuando el jugador sostiene el dron (`ItemAttributes` / `ItemToggle`).
   - En lugar de mostrar siempre `"Recharge Droid (E)"`, reflejar dinámicamente el modo activo o el siguiente modo al encender (ej. `"Drain Droid (E)"` o `"Recharge Droid (E)"`).
