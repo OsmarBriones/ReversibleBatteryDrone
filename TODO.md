@@ -1,7 +1,7 @@
 # Tareas Pendientes (TODO)
 
 ## 1. Metodología de Red y Análisis de Riesgos en RepoKit
-- [ ] **Incorporar Checklist de Arquitectura de Red y Autoridad a RepoKit:**
+- [x] **Incorporar Checklist de Arquitectura de Red y Autoridad a RepoKit:**
   - Agregar sección en `REPO_MODS_METHODOLOGY.md` para evaluar antes de programar si un mod puede ser puramente Host-Only o si requiere instalación en el cliente.
   - Guía de 4 preguntas de validación:
     1. *¿Quién procesa el Input (pulsación de teclas)?* (Detección de `heldByLocalPlayer` y acciones locales).
