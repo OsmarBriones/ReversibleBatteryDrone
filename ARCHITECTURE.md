@@ -44,9 +44,10 @@ This document describes the runtime structure, data flow, and design decisions f
 - **`ItemDrone_StateSearching_Patch`** (Prefix on `ItemDrone.StateSearching`):
   - In vanilla, `SphereCheck` requires `PhysGrabObjectCollider` on colliders, which enemies lack, making them impossible to detect.
   - When in `Drain` mode, intercepts `StateSearching` and delegates to `ReversibleDroneController.CustomStateSearching()`:
-    - Scans a 3.5m radius for batteries, living monsters (`EnemyParent`), and living players (`PlayerAvatar`).
+    - Scans a 3.5m radius for battery items, living monsters (`EnemyParent`), and living players (`PlayerAvatar`).
+    - **Target Priority**: Evaluates candidate targets with strict hierarchical priority (`Battery Items` > `Enemies` > `Players`), ensuring items with battery charge are always drained before leeching monsters or players.
     - Excludes the player currently holding the drone so it can be held and aimed.
-    - Connects to the closest valid target, establishing `magnetTarget` and a valid `rayHitPosition` with synchronized `colliderID` and `viewID` across all network clients (avoiding NRE in `NewRayHitPointLogic` and `DrawBeamLine`).
+    - Connects to the closest valid target within that category, passing the root GameObject transform containing `PhysGrabObject` as `newMagnetTarget` to `NewRayHitPointLogic` (with collider ID from `PhysGrabObjectCollider`), preventing `NullReferenceException` and correctly binding `magnetTarget` across singleplayer and multiplayer.
 - **`ItemDrone_CheckTargetDeath_Patch`** (Prefix on `ItemDrone.CheckTargetDeath`):
   - Prevents vanilla `CheckTargetDeath` from prematurely turning off the drone if `enemyTarget.Spawned` is false in custom spawn setups.
 - **Anti-Exploits**:
@@ -59,7 +60,7 @@ This document describes the runtime structure, data flow, and design decisions f
     - Checks `SemiFunc.IsMasterClientOrSingleplayer()`.
     - Applies `OverrideZeroGravity()`, `OverrideDrag(1f)`, `OverrideAngularDrag(10f)`.
     - When `itemDrone.magnetActive` is true, calls `controller.ExecuteDrain()`:
-      - **Item Siphoning**: Direct conservative energy transfer utilizing native `itemBattery.ChargeBattery(target, rate)` and `targetBattery.Drain(rate)`.
+      - **Item Siphoning**: Direct conservative energy transfer utilizing native `itemBattery.ChargeBattery(target, rate)` and `targetBattery.Drain(rate)` (rate defaults to 5% per second via `TargetBatteryDrainPercentPerSecond`, matching the game's native recharge rate).
       - **Dual HUD Visual Feedback**: Calls `targetBattery.OverrideBatteryShow(0.25f)` + `visualLogic.OverrideBatteryDrain(0.25f)` on the item and `itemBattery.OverrideBatteryShow(0.25f)` + `droneVisualLogic.OverrideBatteryCharge(0.25f)` on the drone so both HUDs and pulsing animations are simultaneously visible.
       - **Life Leeching**: Deals flat HP damage (`MonsterDamageFlatHpPerTick` / `PlayerDamageFlatHpPerTick`) and increments drone battery via `itemBattery.ChargeBattery()` on interval ticks.
       - Detaches via `itemDrone.MagnetActiveToggle(false)` once drone reaches full battery (`>= 99%`) or target has no health/battery left.

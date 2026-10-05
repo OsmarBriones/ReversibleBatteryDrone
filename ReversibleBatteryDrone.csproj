@@ -5,7 +5,7 @@
     <RootNamespace>ReversibleBatteryDrone</RootNamespace>
     <AssemblyName>ReversibleBatteryDrone</AssemblyName>
     <Authors>Osmar Briones</Authors>
-    <Version>1.0.0</Version>
+    <Version>1.0.1</Version>
     <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
   </PropertyGroup>
 

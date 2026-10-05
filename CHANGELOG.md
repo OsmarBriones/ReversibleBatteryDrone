@@ -1,5 +1,11 @@
 # Changelog
 
+## [1.0.1] - 2026-10-05
+- **Targeting Priority Hierarchy**: Implemented strict category priority (`Battery Items` > `Enemies` > `Players`) when searching for drain targets, ensuring the drone always siphons battery items first instead of latching onto nearby teammates or monsters.
+- **Ray Attachment & Transform Binding Fix**: Fixed `NewRayHitPoint` binding to pass the root `PhysGrabObject` transform rather than child colliders, preventing `NullReferenceException` and ensuring reliable beam tethering in singleplayer and multiplayer.
+- **Nested Component & Self-Collision Support**: Added recursive child search for `ItemBattery` and excluded the drone's own child colliders from target evaluation.
+- **Default Siphoning Rate Adjusted**: Changed default `TargetBatteryDrainPercentPerSecond` from 25% to 5% per second to perfectly match the vanilla game's native recharge rate (20 seconds for full charge/drain).
+
 ## [1.0.0] - 2026-10-03
 - **Initial Release!**
 - **Reversible Energy Transfer**: Alternates between **Charge Mode** (powering items with a yellow beam) and **Drain Mode** (siphoning energy back into the drone with a red beam).

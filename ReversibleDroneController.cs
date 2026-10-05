@@ -515,9 +515,14 @@ internal class ReversibleDroneController : MonoBehaviour
 		float searchRadius = 3.5f;
 		Collider[] colliders = Physics.OverlapSphere(transform.position, searchRadius);
 
-		float closestDistance = float.MaxValue;
-		GameObject? bestTarget = null;
-		int targetType = 0; // 1 = Battery Item, 2 = Enemy, 3 = Player
+		float closestBatteryDistance = float.MaxValue;
+		GameObject? bestBatteryTarget = null;
+
+		float closestEnemyDistance = float.MaxValue;
+		GameObject? bestEnemyTarget = null;
+
+		float closestPlayerDistance = float.MaxValue;
+		GameObject? bestPlayerTarget = null;
 
 		PlayerAvatar? holdingPlayer = null;
 		if (physGrabObject != null && physGrabObject.playerGrabbing.Count > 0)
@@ -527,21 +532,23 @@ internal class ReversibleDroneController : MonoBehaviour
 
 		foreach (Collider col in colliders)
 		{
-			if (col == null || col.gameObject == gameObject) continue;
+			if (col == null || col.gameObject == gameObject || col.transform.IsChildOf(transform)) continue;
 
 			// 1. Check for ItemBattery
-			ItemBattery b = col.GetComponent<ItemBattery>() ?? col.GetComponentInParent<ItemBattery>();
+			ItemBattery b = col.GetComponent<ItemBattery>() 
+				?? col.GetComponentInParent<ItemBattery>() 
+				?? col.GetComponentInChildren<ItemBattery>();
+
 			if (b != null && b != itemBattery && b.batteryLife > 0.05f && !b.isUnchargable)
 			{
 				ItemAttributes attr = b.GetComponent<ItemAttributes>() ?? b.GetComponentInParent<ItemAttributes>();
 				if (attr == null || !attr.shopItem)
 				{
 					float dist = Vector3.Distance(transform.position, b.transform.position);
-					if (dist < closestDistance)
+					if (dist < closestBatteryDistance)
 					{
-						closestDistance = dist;
-						bestTarget = b.gameObject;
-						targetType = 1;
+						closestBatteryDistance = dist;
+						bestBatteryTarget = b.gameObject;
 					}
 				}
 			}
@@ -556,11 +563,10 @@ internal class ReversibleDroneController : MonoBehaviour
 					{
 						Transform enemyCenter = ep.Enemy.CenterTransform != null ? ep.Enemy.CenterTransform : ep.transform;
 						float dist = Vector3.Distance(transform.position, enemyCenter.position);
-						if (dist < closestDistance)
+						if (dist < closestEnemyDistance)
 						{
-							closestDistance = dist;
-							bestTarget = ep.gameObject;
-							targetType = 2;
+							closestEnemyDistance = dist;
+							bestEnemyTarget = ep.gameObject;
 						}
 					}
 				}
@@ -574,14 +580,33 @@ internal class ReversibleDroneController : MonoBehaviour
 				{
 					Transform vision = pa.PlayerVisionTarget != null && pa.PlayerVisionTarget.VisionTransform != null ? pa.PlayerVisionTarget.VisionTransform : pa.transform;
 					float dist = Vector3.Distance(transform.position, vision.position);
-					if (dist < closestDistance)
+					if (dist < closestPlayerDistance)
 					{
-						closestDistance = dist;
-						bestTarget = pa.gameObject;
-						targetType = 3;
+						closestPlayerDistance = dist;
+						bestPlayerTarget = pa.gameObject;
 					}
 				}
 			}
+		}
+
+		GameObject? bestTarget = null;
+		int targetType = 0; // 1 = Battery Item, 2 = Enemy, 3 = Player
+
+		// Priority: Battery Items > Enemies > Players
+		if (bestBatteryTarget != null)
+		{
+			bestTarget = bestBatteryTarget;
+			targetType = 1;
+		}
+		else if (bestEnemyTarget != null)
+		{
+			bestTarget = bestEnemyTarget;
+			targetType = 2;
+		}
+		else if (bestPlayerTarget != null)
+		{
+			bestTarget = bestPlayerTarget;
+			targetType = 3;
 		}
 
 		if (bestTarget == null) return false;
@@ -596,10 +621,10 @@ internal class ReversibleDroneController : MonoBehaviour
 		// Attach to best target
 		if (targetType == 1)
 		{
-			ItemBattery targetBattery = bestTarget.GetComponent<ItemBattery>() ?? bestTarget.GetComponentInParent<ItemBattery>();
-			itemDrone.magnetTarget = targetBattery.transform;
-			itemDrone.magnetTargetPhysGrabObject = targetBattery.GetComponent<PhysGrabObject>();
-			itemDrone.magnetTargetRigidbody = targetBattery.GetComponent<Rigidbody>();
+			ItemBattery targetBattery = bestTarget.GetComponent<ItemBattery>() 
+				?? bestTarget.GetComponentInParent<ItemBattery>() 
+				?? bestTarget.GetComponentInChildren<ItemBattery>();
+
 			itemDrone.targetIsEnemy = false;
 			itemDrone.targetIsPlayer = false;
 			itemDrone.targetIsLocalPlayer = false;
@@ -607,22 +632,33 @@ internal class ReversibleDroneController : MonoBehaviour
 			itemDrone.playerAvatarTarget = null;
 			itemDrone.playerTumbleTarget = null;
 
-			Vector3 attachPos = targetBattery.transform.position;
-			PhysGrabObject? pgo = targetBattery.GetComponent<PhysGrabObject>() ?? targetBattery.GetComponentInParent<PhysGrabObject>();
-			int colliderId = 0;
-			Transform targetTransform = targetBattery.transform;
-			if (pgo != null && pgo.colliders != null && pgo.colliders.Count > 0)
+			PhysGrabObject? pgo = targetBattery.GetComponent<PhysGrabObject>() 
+				?? targetBattery.GetComponentInParent<PhysGrabObject>()
+				?? targetBattery.GetComponentInChildren<PhysGrabObject>();
+
+			Transform rootTransform = pgo != null ? pgo.transform : targetBattery.transform;
+			int colliderId = -1;
+			Vector3 attachPos = rootTransform.position;
+
+			if (pgo != null && pgo.colliders != null && pgo.colliders.Count > 0 && pgo.colliders[0] != null)
 			{
 				var pgc = pgo.colliders[0].GetComponent<PhysGrabObjectCollider>();
 				if (pgc != null)
 				{
 					colliderId = pgc.colliderID;
-					targetTransform = pgo.colliders[0];
+					attachPos = pgo.colliders[0].position;
 				}
 			}
+
+			itemDrone.magnetTarget = (colliderId != -1 && pgo != null && pgo.colliders != null && pgo.colliders.Count > 0) ? pgo.colliders[0] : rootTransform;
+			itemDrone.magnetTargetPhysGrabObject = pgo;
+			itemDrone.magnetTargetRigidbody = rootTransform.GetComponent<Rigidbody>();
+
 			PhotonView? pv = pgo != null && pgo.photonView != null ? pgo.photonView : targetBattery.GetComponent<PhotonView>();
 			int viewId = pv != null ? pv.ViewID : 0;
-			itemDrone.NewRayHitPoint(attachPos, viewId, colliderId, targetTransform);
+
+			// targetTransform MUST be rootTransform (the object with PhysGrabObject), NOT the child collider!
+			itemDrone.NewRayHitPoint(attachPos, viewId, colliderId, rootTransform);
 			if (itemDrone.rayHitPosition == Vector3.zero) itemDrone.rayHitPosition = new Vector3(0f, 0.05f, 0f);
 			itemDrone.attachPoint = itemDrone.rayHitPosition;
 			return true;
@@ -639,26 +675,31 @@ internal class ReversibleDroneController : MonoBehaviour
 			itemDrone.playerTumbleTarget = null;
 
 			Transform enemyCenter = ep.Enemy.CenterTransform != null ? ep.Enemy.CenterTransform : ep.transform;
-			itemDrone.magnetTarget = enemyCenter;
-			itemDrone.magnetTargetPhysGrabObject = ep.Enemy.Rigidbody != null ? ep.Enemy.Rigidbody.physGrabObject : ep.GetComponent<PhysGrabObject>();
+			PhysGrabObject? pgo = ep.Enemy.Rigidbody != null ? ep.Enemy.Rigidbody.physGrabObject : ep.GetComponent<PhysGrabObject>();
+			itemDrone.magnetTargetPhysGrabObject = pgo;
 			itemDrone.magnetTargetRigidbody = ep.Enemy.Rigidbody != null ? ep.Enemy.Rigidbody.rb : ep.GetComponent<Rigidbody>();
 
+			Transform rootTransform = pgo != null ? pgo.transform : enemyCenter;
+			int colliderId = -1;
 			Vector3 attachPos = enemyCenter.position + Vector3.up * 0.1f;
-			PhysGrabObject? pgo = itemDrone.magnetTargetPhysGrabObject;
-			int colliderId = 0;
-			Transform targetTransform = enemyCenter;
-			if (pgo != null && pgo.colliders != null && pgo.colliders.Count > 0)
+
+			if (pgo != null && pgo.colliders != null && pgo.colliders.Count > 0 && pgo.colliders[0] != null)
 			{
 				var pgc = pgo.colliders[0].GetComponent<PhysGrabObjectCollider>();
 				if (pgc != null)
 				{
 					colliderId = pgc.colliderID;
-					targetTransform = pgo.colliders[0];
+					attachPos = pgo.colliders[0].position;
 				}
 			}
+
+			itemDrone.magnetTarget = (colliderId != -1 && pgo != null && pgo.colliders != null && pgo.colliders.Count > 0) ? pgo.colliders[0] : enemyCenter;
+
 			PhotonView? pv = pgo != null && pgo.photonView != null ? pgo.photonView : (ep.Enemy.PhotonView != null ? ep.Enemy.PhotonView : ep.GetComponent<PhotonView>());
 			int viewId = pv != null ? pv.ViewID : 0;
-			itemDrone.NewRayHitPoint(attachPos, viewId, colliderId, targetTransform);
+
+			// targetTransform MUST be rootTransform (the object with PhysGrabObject), NOT the child collider!
+			itemDrone.NewRayHitPoint(attachPos, viewId, colliderId, rootTransform);
 			if (itemDrone.rayHitPosition == Vector3.zero) itemDrone.rayHitPosition = new Vector3(0f, 0.05f, 0f);
 			itemDrone.attachPoint = itemDrone.rayHitPosition;
 
@@ -744,7 +785,7 @@ internal class ReversibleDroneController : MonoBehaviour
 				droneVisualLogic.OverrideBatteryCharge(0.25f);
 			}
 
-			float rate = ConfigurationController.TargetBatteryDrainPercentPerSecond?.Value ?? 25f;
+			float rate = ConfigurationController.TargetBatteryDrainPercentPerSecond?.Value ?? 5f;
 
 			// Use the native game engine charging and draining pipeline
 			targetBattery.Drain(rate);

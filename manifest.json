@@ -1,6 +1,6 @@
 {
     "name":  "ReversibleBatteryDrone",
-    "version_number":  "1.0.0",
+    "version_number":  "1.0.1",
     "website_url":  "https://github.com/OsmarBriones/ReversibleBatteryDrone",
     "description":  "Makes the charge drone reversible (Charge/Drain). Only Host needed (clients can optionally install for red beam visuals). Fully configurable.",
     "dependencies":  [
