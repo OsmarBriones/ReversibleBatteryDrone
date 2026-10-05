@@ -1,5 +1,8 @@
 # Changelog
 
+## [1.0.2] - 2026-10-05
+- **Documentation & Media**: Added gameplay showcase GIF to README demonstrating alternating Charge Mode and Drain Mode mechanics in action.
+
 ## [1.0.1] - 2026-10-05
 - **Targeting Priority Hierarchy**: Implemented strict category priority (`Battery Items` > `Enemies` > `Players`) when searching for drain targets, ensuring the drone always siphons battery items first instead of latching onto nearby teammates or monsters.
 - **Ray Attachment & Transform Binding Fix**: Fixed `NewRayHitPoint` binding to pass the root `PhysGrabObject` transform rather than child colliders, preventing `NullReferenceException` and ensuring reliable beam tethering in singleplayer and multiplayer.
