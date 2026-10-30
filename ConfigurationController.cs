@@ -7,6 +7,7 @@ internal static class ConfigurationController
 	private static ConfigFile? ConfigFile { get; set; }
 
 	internal static ConfigEntry<bool>? Enabled { get; private set; }
+	internal static ConfigEntry<bool>? DebugLogging { get; private set; }
 
 	// Item Siphoning
 	internal static ConfigEntry<int>? TargetBatteryDrainPercentPerSecond { get; private set; }
@@ -31,6 +32,13 @@ internal static class ConfigurationController
 			nameof(Enabled),
 			true,
 			"Enable or disable the ReversibleBatteryDrone mod entirely."
+		);
+
+		DebugLogging = ConfigFile.Bind(
+			"General",
+			nameof(DebugLogging),
+			false,
+			"Logs the measured Drain Mode charge rate once per second (measured vs. expected %/s). For diagnostics only."
 		);
 
 		// Item Siphoning

@@ -1,5 +1,9 @@
 # Changelog
 
+## [Unreleased]
+- **Game update compatibility (Sunstone)**: Life leeching now delivers exactly `DroneBatteryGainPercentPerTick` per tick (previously ~40% at the default tick interval, because chargers now expire after 0.1s). Item siphoning now compensates the game's new 2x battery rate multiplier, so `TargetBatteryDrainPercentPerSecond` is the real percent per second again.
+- **Diagnostics**: Added opt-in `DebugLogging` setting (`[General]`, default `false`) that logs the measured Drain Mode charge rate once per second against the expected rate.
+
 ## [1.0.2] - 2026-10-05
 - **Documentation & Media**: Added gameplay showcase GIF to README demonstrating alternating Charge Mode and Drain Mode mechanics in action.
 

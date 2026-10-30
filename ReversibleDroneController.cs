@@ -20,7 +20,14 @@ internal class ReversibleDroneController : MonoBehaviour
 	private Color originalBeamColor;
 	private bool colorsCached;
 
+	// ItemBattery applies this multiplier to every continuous charge/drain rate (see ItemBattery.continuousRateMultiplier).
+	private const float GameBatteryRateMultiplier = 2f;
+
 	private float tickTimer;
+	private string? diagSource;
+	private float diagWindowStart;
+	private float diagLastCall;
+	private float diagStartLife;
 	private EnemyParent? activeEnemyTarget;
 	private bool naturalFullChargeDetach;
 	private bool distanceBreakDetach;
@@ -739,6 +746,28 @@ internal class ReversibleDroneController : MonoBehaviour
 		return false;
 	}
 
+	private void LogDrainDiagnostics(string source, float expectedPerSecond)
+	{
+		if (ConfigurationController.DebugLogging?.Value != true || itemBattery == null) return;
+
+		float now = Time.time;
+		if (diagSource != source || now - diagLastCall > 0.5f)
+		{
+			diagSource = source;
+			diagWindowStart = now;
+			diagStartLife = itemBattery.batteryLife;
+		}
+		diagLastCall = now;
+
+		float elapsed = now - diagWindowStart;
+		if (elapsed < 1f) return;
+
+		float measured = (itemBattery.batteryLife - diagStartLife) / elapsed;
+		ReversibleBatteryDronePlugin.Logger?.LogInfo($"[ReversibleBatteryDrone] [Diag] {source}: measured {measured:F2}%/s vs expected {expectedPerSecond:F2}%/s ({(expectedPerSecond > 0f ? measured / expectedPerSecond : 0f):P0}) over {elapsed:F2}s, drone battery {itemBattery.batteryLife:F1}%");
+		diagWindowStart = now;
+		diagStartLife = itemBattery.batteryLife;
+	}
+
 	public void ExecuteDrain()
 	{
 		if (!SemiFunc.IsMasterClientOrSingleplayer()) return;
@@ -788,8 +817,11 @@ internal class ReversibleDroneController : MonoBehaviour
 			float rate = ConfigurationController.TargetBatteryDrainPercentPerSecond?.Value ?? 5f;
 
 			// Use the native game engine charging and draining pipeline
-			targetBattery.Drain(rate);
-			itemBattery.ChargeBattery(targetBattery.gameObject, rate);
+			// Divide by the game's rate multiplier so the configured value is the real %/s.
+			float gameRate = rate / GameBatteryRateMultiplier;
+			targetBattery.Drain(gameRate);
+			itemBattery.ChargeBattery(targetBattery.gameObject, gameRate);
+			LogDrainDiagnostics("ItemSiphon", rate);
 
 			// Detach if target is completely drained or drone reached full capacity
 			if (targetBattery.batteryLife <= 0.05f)
@@ -836,6 +868,7 @@ internal class ReversibleDroneController : MonoBehaviour
 
 			tickTimer += Time.deltaTime;
 			float tickRate = ConfigurationController.LeechTickIntervalSeconds?.Value ?? 0.5f;
+			LogDrainDiagnostics("MonsterLeech", (ConfigurationController.DroneBatteryGainPercentPerTick?.Value ?? 1f) / Mathf.Max(0.01f, tickRate));
 			if (tickTimer >= tickRate)
 			{
 				tickTimer = 0f;
@@ -843,7 +876,7 @@ internal class ReversibleDroneController : MonoBehaviour
 				float gain = ConfigurationController.DroneBatteryGainPercentPerTick?.Value ?? 1f;
 
 				enemyHealth.Hurt(dmg, Vector3.up * 0.1f);
-				itemBattery.ChargeBattery(enemyParent.gameObject, gain * (1f / Mathf.Max(0.01f, tickRate)));
+				itemBattery.ReceiveCharge(gain);
 
 				if (enemyHealth.dead || enemyHealth.healthCurrent <= 0 || itemBattery.batteryLife >= 99f)
 				{
@@ -881,6 +914,7 @@ internal class ReversibleDroneController : MonoBehaviour
 
 			tickTimer += Time.deltaTime;
 			float tickRate = ConfigurationController.LeechTickIntervalSeconds?.Value ?? 0.5f;
+			LogDrainDiagnostics("PlayerLeech", (ConfigurationController.DroneBatteryGainPercentPerTick?.Value ?? 1f) / Mathf.Max(0.01f, tickRate));
 			if (tickTimer >= tickRate)
 			{
 				tickTimer = 0f;
@@ -888,7 +922,7 @@ internal class ReversibleDroneController : MonoBehaviour
 				float gain = ConfigurationController.DroneBatteryGainPercentPerTick?.Value ?? 1f;
 
 				player.playerHealth.HurtOther(dmg, Vector3.zero, false);
-				itemBattery.ChargeBattery(player.gameObject, gain * (1f / Mathf.Max(0.01f, tickRate)));
+				itemBattery.ReceiveCharge(gain);
 
 				if (player.deadSet || player.playerHealth.health <= 0 || itemBattery.batteryLife >= 99f)
 				{
