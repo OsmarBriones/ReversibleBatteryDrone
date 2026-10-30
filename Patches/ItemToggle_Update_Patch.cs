@@ -13,7 +13,7 @@ internal static class ItemToggle_Update_Patch
 		var controller = __instance.GetComponent<ReversibleDroneController>();
 		if (controller == null)
 		{
-			if (__instance.GetComponent<ItemDroneBattery>() != null || __instance.GetComponent<ItemDrone>() != null)
+			if (__instance.GetComponent<ItemDroneBattery>() != null)
 			{
 				controller = __instance.gameObject.AddComponent<ReversibleDroneController>();
 				var pv = __instance.GetComponent<Photon.Pun.PhotonView>();

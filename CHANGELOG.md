@@ -1,5 +1,8 @@
 # Changelog
 
+## [Unreleased]
+- **Fix**: The mod no longer attaches itself to other drone types (e.g. the Feather drone). Only the Charge Drone is made reversible now; other drones keep their vanilla behavior.
+
 ## [1.0.3] - 2026-10-29
 - **Game update compatibility (Sunstone)**: Life leeching now delivers exactly `DroneBatteryGainPercentPerTick` per tick (previously ~40% at the default tick interval, because chargers now expire after 0.1s). Item siphoning now compensates the game's new 2x battery rate multiplier, so `TargetBatteryDrainPercentPerSecond` is the real percent per second again. The mod detects the game's battery API at runtime and keeps working on game versions from before the Sunstone update.
 - **Diagnostics**: Added opt-in `DebugLogging` setting (`[General]`, default `false`) that logs the measured Drain Mode charge rate once per second against the expected rate.
