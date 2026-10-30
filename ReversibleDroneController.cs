@@ -1,3 +1,6 @@
+using System;
+using System.Reflection;
+using HarmonyLib;
 using Photon.Pun;
 using UnityEngine;
 
@@ -20,8 +23,26 @@ internal class ReversibleDroneController : MonoBehaviour
 	private Color originalBeamColor;
 	private bool colorsCached;
 
-	// ItemBattery applies this multiplier to every continuous charge/drain rate (see ItemBattery.continuousRateMultiplier).
-	private const float GameBatteryRateMultiplier = 2f;
+	// Game versions with ItemBattery.ReceiveCharge (Sunstone update and later) multiply every continuous
+	// charge/drain rate by 2 and expire chargers after 0.1s. Older versions do neither, so detect it at runtime.
+	private static readonly Func<ItemBattery, float, float>? ReceiveCharge = CreateReceiveChargeDelegate();
+	private static readonly float GameBatteryRateMultiplier = ReceiveCharge != null ? 2f : 1f;
+
+	private static Func<ItemBattery, float, float>? CreateReceiveChargeDelegate()
+	{
+		MethodInfo? method = AccessTools.Method(typeof(ItemBattery), "ReceiveCharge", new[] { typeof(float) });
+		return method == null ? null : (Func<ItemBattery, float, float>)Delegate.CreateDelegate(typeof(Func<ItemBattery, float, float>), method);
+	}
+
+	private void LeechCharge(GameObject source, float gain, float tickRate)
+	{
+		if (ReceiveCharge != null)
+		{
+			ReceiveCharge(itemBattery, gain);
+			return;
+		}
+		itemBattery.ChargeBattery(source, gain * (1f / Mathf.Max(0.01f, tickRate)));
+	}
 
 	private float tickTimer;
 	private string? diagSource;
@@ -817,7 +838,7 @@ internal class ReversibleDroneController : MonoBehaviour
 			float rate = ConfigurationController.TargetBatteryDrainPercentPerSecond?.Value ?? 5f;
 
 			// Use the native game engine charging and draining pipeline
-			// Divide by the game's rate multiplier so the configured value is the real %/s.
+			// Divide by the game's rate multiplier (1 on older versions) so the configured value is the real %/s.
 			float gameRate = rate / GameBatteryRateMultiplier;
 			targetBattery.Drain(gameRate);
 			itemBattery.ChargeBattery(targetBattery.gameObject, gameRate);
@@ -876,7 +897,7 @@ internal class ReversibleDroneController : MonoBehaviour
 				float gain = ConfigurationController.DroneBatteryGainPercentPerTick?.Value ?? 1f;
 
 				enemyHealth.Hurt(dmg, Vector3.up * 0.1f);
-				itemBattery.ReceiveCharge(gain);
+				LeechCharge(enemyParent.gameObject, gain, tickRate);
 
 				if (enemyHealth.dead || enemyHealth.healthCurrent <= 0 || itemBattery.batteryLife >= 99f)
 				{
@@ -922,7 +943,7 @@ internal class ReversibleDroneController : MonoBehaviour
 				float gain = ConfigurationController.DroneBatteryGainPercentPerTick?.Value ?? 1f;
 
 				player.playerHealth.HurtOther(dmg, Vector3.zero, false);
-				itemBattery.ReceiveCharge(gain);
+				LeechCharge(player.gameObject, gain, tickRate);
 
 				if (player.deadSet || player.playerHealth.health <= 0 || itemBattery.batteryLife >= 99f)
 				{
