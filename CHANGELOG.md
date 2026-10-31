@@ -1,6 +1,6 @@
 # Changelog
 
-## [Unreleased]
+## [1.0.4] - 2026-10-31
 - **Fix**: The mod no longer attaches itself to other drone types (e.g. the Feather drone). Only the Charge Drone is made reversible now; other drones keep their vanilla behavior.
 
 ## [1.0.3] - 2026-10-29
